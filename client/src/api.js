@@ -43,14 +43,45 @@ export const teamsApi = {
   list: () => api('/api/teams'),
   get: (id) => api(`/api/teams/${id}`),
   create: (payload) => api('/api/teams', { method: 'POST', body: payload }),
-  // One idempotency key per join *intent*: if the request is retried, the
-  // server returns the original result instead of joining twice.
-  join: (id) =>
-    api(`/api/teams/${id}/join`, {
-      method: 'POST',
-      body: {},
-      headers: { 'Idempotency-Key': `join-${id}-${crypto.randomUUID()}` },
-    }),
+  // One idempotency key per join *intent* for a given team (see joinKeyFor
+  // below): retries of the same intent reuse the key, so the server returns
+  // the original result instead of joining twice.
+  join: async (id) => {
+    try {
+      const data = await api(`/api/teams/${id}/join`, {
+        method: 'POST',
+        body: {},
+        headers: { 'Idempotency-Key': joinKeyFor(id) },
+      });
+      clearJoinKey(id); // server answered with success — this intent is done
+      return data;
+    } catch (err) {
+      // If the server ANSWERED (err.status is set — even a 409 verdict),
+      // the intent is settled, so drop the key. If there was no response
+      // at all (network failure — the join may or may not have happened),
+      // KEEP the key so the retry is recognised as a replay, not a new join.
+      if (err.status) clearJoinKey(id);
+      throw err;
+    }
+  },
   leave: (id) => api(`/api/teams/${id}/leave`, { method: 'POST', body: {} }),
   remove: (id) => api(`/api/teams/${id}`, { method: 'DELETE' }),
 };
+
+// The join key for a team lives in sessionStorage: it survives retries and
+// even a page reload mid-flow, but disappears when the tab closes. (The
+// server scopes keys per user, so a key string is only ever a replay for
+// the account that first used it.)
+function joinKeyFor(teamId) {
+  const storageKey = `join-key-${teamId}`;
+  let key = sessionStorage.getItem(storageKey);
+  if (!key) {
+    key = `join-${teamId}-${crypto.randomUUID()}`;
+    sessionStorage.setItem(storageKey, key);
+  }
+  return key;
+}
+
+function clearJoinKey(teamId) {
+  sessionStorage.removeItem(`join-key-${teamId}`);
+}
