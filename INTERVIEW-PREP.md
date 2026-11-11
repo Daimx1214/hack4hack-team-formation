@@ -257,7 +257,8 @@ tokens, instead of a single 7-day JWT.
 | File | The one thing it does |
 | --- | --- |
 | `concurrency.test.js` | **The proof**: 8 racers / 2 seats, self-races, leave races, registration race, idempotency storms — 8 tests. |
-| `teams.test.js` | Sequential team behaviour: create/list/get/join/leave/delete, full-team and duplicate-join `409`s, owner rules — 17 tests. |
+| `teams.test.js` | Sequential team behaviour: create/list/get/join/leave/delete, full-team and duplicate-join `409`s, owner rules, populated member names on GET — 18 tests. |
+| `join-error-path.test.js` | Unit-style (stubbed model) regression tests for the delete-mid-join race in `joinTeam`'s error path: re-read null → `404`, never `500` — 2 tests. |
 | `auth.test.js` | Register/login/me happy paths and failures (duplicate email, wrong password, no token) — 9 tests. |
 | `edge-cases.test.js` | Hostile inputs: forged tokens, malformed ids, deleted teams, capacity boundaries (1, 0, 2.5 rejected) — 16 tests. |
 | `setup.js` / `helpers.js` | Spin up the in-memory MongoDB per test file; small factories for users/teams/tokens. |
@@ -266,7 +267,7 @@ tokens, instead of a single 7-day JWT.
 
 | File | The one thing it does |
 | --- | --- |
-| `api.js` | The fetch wrapper: attaches the JWT from localStorage, throws the server's error message — and generates the **`Idempotency-Key`** on every join call. |
+| `api.js` | The fetch wrapper: attaches the JWT from localStorage, throws the server's error message — and keeps one stable **`Idempotency-Key`** per join intent (sessionStorage) so retries replay instead of re-joining. |
 | `App.jsx` | Shell + routes: nav (Teams / Create team / Log in / Register), restores the session from the stored token via `/auth/me`. |
 | `pages/Teams.jsx` | Home: team cards with member counts and seats-left badges (`FULL` / "1 seat left"). |
 | `pages/TeamDetail.jsx` | Team page: member list, Join/Leave/Delete buttons; shows API `409`s as a plain red banner — the race-proofing made visible. |

@@ -228,6 +228,10 @@ Test files (in `server/tests/`):
   delete, join/leave/delete against deleted or nonexistent teams `404`,
   malformed ids `404`, non-owner member delete `403`, and the capacity
   boundaries (1, 0, 2.5 rejected; capacity 2 = owner + exactly one seat).
+- `join-error-path.test.js` — unit-style regression tests (stubbed Team
+  model) for the delete-mid-join race in `joinTeam`'s error path: the
+  re-read returning null must answer `404`, never throw a `500`; the
+  ordinary full-team `409` on the same path is pinned too.
 
 Target: **20+ API tests**, all running in CI
 (`.github/workflows/ci.yml`) on every push and pull request.

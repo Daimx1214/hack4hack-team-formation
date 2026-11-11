@@ -172,15 +172,15 @@ tests just below it in the same file).
 > returns the original result instead of joining twice. Retries are
 > safe by design."
 
-## Segment 6 — All 50 tests and CI (3:35–4:05)
+## Segment 6 — All 53 tests and CI (3:35–4:05)
 
 **On screen:** In the terminal, show the full suite result
-(`cd server && npm test` → **"Tests: 50 passed"**). Then switch to the
+(`cd server && npm test` → **"Tests: 53 passed"**). Then switch to the
 GitHub Actions tab showing the green CI run for the latest push.
 
 **Say:**
 
-> "In total there are fifty API tests, all passing. They cover the happy
+> "In total there are fifty-three API tests, all passing. They cover the happy
 > paths, the edge cases — duplicate email returns 409, bad tokens return
 > 401, deleted teams return 404 — and the whole concurrency suite.
 >
@@ -237,7 +237,7 @@ until the end.
 - [ ] Total length is at or under 5:00.
 - [ ] The 409 banner ("Team is full") is clearly visible in Segment 4.
 - [ ] The "8 racers, 2 free seats" test name is readable in Segment 5.
-- [ ] "50 passed" and the green CI run are readable in Segment 6.
+- [ ] "53 passed" and the green CI run are readable in Segment 6.
 - [ ] p95 = 10.1 ms is readable in Segment 7.
 - [ ] No real passwords, tokens, or personal data on screen anywhere
       (demo accounts only).

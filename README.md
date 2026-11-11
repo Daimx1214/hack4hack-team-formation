@@ -83,7 +83,7 @@ cd server
 npm test
 ```
 
-**50 API tests, all passing** — happy paths, edge cases (duplicate email
+**53 API tests, all passing** — happy paths, edge cases (duplicate email
 `409`, forged/missing tokens `401`, deleted-team `404`s, capacity
 boundaries) and the concurrency suite that proves the race-proofing:
 join/leave stampedes, duplicate-registration races, and idempotency-key
