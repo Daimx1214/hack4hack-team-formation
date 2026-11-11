@@ -232,24 +232,36 @@ Test files (in `server/tests/`):
 Target: **20+ API tests**, all running in CI
 (`.github/workflows/ci.yml`) on every push and pull request.
 
-## 6. Load-test plan
+## 6. Load test
 
-Tool: **Artillery** (pure Node, easy YAML scenarios) against the deployed
-API (and re-checked locally before the demo).
+Tool: **Artillery** (`npx artillery`, config in `load/artillery.yml`)
+against the API — run locally first, then re-run against the deployed
+URL for the submission numbers.
 
-Scenario that matters — *the last-seat stampede*:
+Two scenarios run **together** for 40 s at ~30 virtual users/second
+(~1,200 VUs total) — this is what a deadline rush actually looks like:
+people browsing while others stampede the Join button.
 
-1. Seed: one team with capacity 5 (owner + 4 free seats), 100 test users.
-2. All 100 users `POST /teams/:id/join` in the same short window.
-3. Assert: exactly 4 joins succeed, `memberCount == 5` afterwards, and
-   **p95 latency < 200 ms** (the PS1 requirement) with zero 5xx errors.
+| Scenario | Weight | What it does |
+| -------- | ------ | ------------ |
+| Browse teams | 70% | `GET /api/teams`, then `GET /api/teams/:id` — the read traffic. |
+| Join stampede | 30% | `POST /api/teams/:id/join` against **one team of capacity 10**, from a pool of 100 prepared users. |
 
-A second, gentler scenario (browse teams list + team details at ~50 req/s
-for 60 s) confirms read endpoints also stay under the p95 budget.
-Load-test config and results live in `load/` (see `load/README.md`).
-First local run (Nov 11, 2026): 2,029 requests, zero errors,
-**p95 = 10.1 ms** — details in `load/results-local.txt`; the same config
-is re-run against the deployed URL for the submission numbers.
+About the stampede numbers: capacity is capped at 10 and the owner
+holds seat #1, so only 9 joins can ever return `200`; every other join
+correctly returns `409` ("Team is full" / "already a member"). That is
+**the race working as designed**, reproduced under load — the load run
+asserts that responses stay fast and there are **zero 5xx errors**, with
+**p95 latency < 200 ms** (the PS1 requirement). Exact success counts
+(exactly 9 succeed, the count ends at exactly 10, no duplicate members)
+are **not** asserted here — they are proven deterministically by the
+Jest concurrency tests (§5), which is the right tool for exactness.
+
+Setup and results live in `load/` (see `load/README.md`): `prepare.js`
+creates the 100 users and the stampede team, `run-local.js` runs the
+whole thing against a throwaway local stack in one command. First local
+run (Nov 11, 2026): 2,029 requests completed, zero errors, **p95 =
+10.1 ms** — details in `load/results-local.txt`.
 
 ## 7. Deployment plan (all free tiers)
 
