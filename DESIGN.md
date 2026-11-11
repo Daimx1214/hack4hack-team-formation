@@ -246,8 +246,10 @@ Scenario that matters — *the last-seat stampede*:
 
 A second, gentler scenario (browse teams list + team details at ~50 req/s
 for 60 s) confirms read endpoints also stay under the p95 budget.
-Load-test script and results will live in `load-test/` with the numbers
-recorded in the README before submission.
+Load-test config and results live in `load/` (see `load/README.md`).
+First local run (Nov 11, 2026): 2,029 requests, zero errors,
+**p95 = 10.1 ms** — details in `load/results-local.txt`; the same config
+is re-run against the deployed URL for the submission numbers.
 
 ## 7. Deployment plan (all free tiers)
 

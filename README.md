@@ -32,7 +32,7 @@ operation** (see `DESIGN.md` for the full explanation).
 | Auth     | JWT (register / login)              |
 | Tests    | Jest + Supertest + mongodb-memory-server |
 | CI       | GitHub Actions                      |
-| Load test| Artillery (plan in `DESIGN.md`)     |
+| Load test| Artillery (config + results in `load/`) |
 
 ## Project layout
 
@@ -41,6 +41,7 @@ hack4hack/
 ├── server/            Express API (src: config, models, routes, controllers, middleware)
 │   └── tests/         Jest + Supertest API tests
 ├── client/            React (Vite) frontend
+├── load/              Artillery load test: config, prepare/processor, local runner + results
 ├── DESIGN.md          Design doc: data model, race strategy, API, testing, load test
 └── BUILD-PLAN.md      Day-by-day build plan (Nov 11 → Nov 15)
 ```
@@ -82,9 +83,54 @@ cd server
 npm test
 ```
 
+**50 API tests, all passing** — happy paths, edge cases (duplicate email
+`409`, forged/missing tokens `401`, deleted-team `404`s, capacity
+boundaries) and the concurrency suite that proves the race-proofing:
+join/leave stampedes, duplicate-registration races, and idempotency-key
+retry storms.
+
 The tests do **not** need a running MongoDB — they use
 `mongodb-memory-server`, which starts a throwaway in-memory MongoDB,
 runs the suite against the real Express app, and tears it down.
+
+### 5. Seed demo data (optional)
+
+```bash
+cd server
+npm run seed        # WARNING: wipes the database first, then seeds it
+```
+
+Creates the demo users and teams below so the app — and the demo video —
+can be explored immediately: one team is full, the others have free seats.
+
+#### Demo accounts
+
+All six accounts use the same throwaway password: **`demo1234`**
+(fake accounts created by the seed script for this hackathon demo —
+not real credentials).
+
+| Name             | Email               |
+| ---------------- | ------------------- |
+| Ayesha Khan      | ayesha@example.com  |
+| Bilal Ahmed      | bilal@example.com   |
+| Chen Wei         | chen@example.com    |
+| Dana Petrova     | dana@example.com    |
+| Elias Rodriguez  | elias@example.com   |
+| Fatima Noor      | fatima@example.com  |
+
+### 6. Load test
+
+```bash
+node load/run-local.js   # one command: in-memory DB + API + Artillery
+```
+
+Latest **local** run (Nov 11, 2026; API, in-memory MongoDB and Artillery
+all sharing one small dev VM): 2,029 requests at ~52 req/s — 1,667 × 200,
+362 × 409 (the stampede's losing joins, by design), **zero errors**,
+**p95 = 10.1 ms** against the PS1 target of p95 < 200 ms.
+Full numbers in `load/results-local.txt`; how it works in `load/README.md`.
+The same `load/artillery.yml` gets re-run against the deployed URL for
+the submission numbers.
 
 ## API summary
 

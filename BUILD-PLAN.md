@@ -27,6 +27,11 @@ PS1 deliverables checklist (from the challenge):
 - [x] Models: User, Team, JoinRequest; JWT auth (register/login/me)
 - [x] Race-proof join/leave via atomic conditional update (see DESIGN.md §3)
 - [x] Test suite: auth + teams + concurrency (Jest + Supertest + memory Mongo) — **29 tests, all passing locally on day 1** (the 20+ target is already met; Thu adds edge cases on top)
+- [x] Wed-evening additions (pulled forward from Thu/Sat): edge-case + leave-race +
+      idempotency-under-concurrency tests → **50 tests, all passing**; duplicate-email
+      register now returns 409 (race-safe); seed script; client UI polish
+      (banners, seats-left badges, footer); Artillery load test run LOCALLY —
+      **p95 10.1 ms, zero errors** (see `load/results-local.txt`; live-URL re-run still owed)
 - [x] CI workflow running the API tests (runs once the repo is pushed to GitHub)
 - [x] README + DESIGN.md first versions
 - [x] Verified: server boots and serves (`/api/health` 200, register 201); client `npm run build` succeeds
@@ -35,9 +40,11 @@ PS1 deliverables checklist (from the challenge):
 ## Thu Nov 12 — Backend completion + tests to 20+
 
 - [ ] Polish validation + error messages across all endpoints
-- [ ] Add remaining API tests on top of the 29 passing: pagination/filter of team list,
-      malformed ObjectId → 404 on join, register/login edge cases
-- [ ] Seed script (`server/src/seed.js`) with demo users + teams for the demo
+- [x] Add remaining API tests on top of the 29 passing (done Wed Nov 11): register/login
+      edge cases, malformed ObjectId → 404 on join/leave/delete, capacity boundaries,
+      leave races, concurrent idempotent replays → 50 total
+- [ ] Still open: pagination/filter of team list (endpoint currently returns all teams)
+- [x] Seed script (`server/src/seed.js`) with demo users + teams for the demo (done Wed Nov 11)
 - [ ] Postman/curl smoke script against a locally running server
 - [ ] **Signups only Daim can do (do them today, they gate deployment):**
   - MongoDB Atlas account + free M0 cluster → connection string
@@ -50,8 +57,9 @@ PS1 deliverables checklist (from the challenge):
 
 - [ ] Client pages finished: Register, Login, Teams list, Team detail
       (member list, seats-left indicator, Join/Leave buttons), Create team
-- [ ] Client handles 409 states gracefully ("Team full", "Already a member")
-      and retries joins with a stable `Idempotency-Key`
+- [x] Client handles 409 states gracefully ("Team full", "Already a member")
+      and retries joins with a stable `Idempotency-Key` (done Wed Nov 11:
+      error/success banners + seats-left badges; in-flight Join disabled)
 - [ ] Deploy: Atlas (DB) → Render (API, env vars set) → Vercel/Netlify (client,
       `VITE_API_URL` pointing at Render)
 - [ ] Full end-to-end smoke test on the **live** URLs
@@ -61,7 +69,8 @@ PS1 deliverables checklist (from the challenge):
 
 - [ ] Morning only: Artillery load test (last-seat stampede scenario,
       DESIGN.md §6) against the live API; record p95 + success counts in
-      `load-test/` and README
+      `load/` and README — LOCAL run already done Wed Nov 11 (p95 10.1 ms,
+      zero errors, `load/results-local.txt`); only the live-URL re-run remains
 - [ ] If p95 fails: profile join endpoint (indexes, response size) and re-run
 - [ ] Final pass on DESIGN.md — numbers from the real load test filled in
 - [ ] Draft the demo-video script (see below)
@@ -96,7 +105,7 @@ PS1 deliverables checklist (from the challenge):
 - [ ] Public repo, CI green, README complete with live URL
 - [ ] Live client URL loads; live API `/api/health` returns ok
 - [ ] 20+ API tests passing locally and in CI
-- [ ] Load-test results committed (`load-test/`)
+- [ ] Load-test results committed (`load/` — local results in; live-URL re-run pending)
 - [ ] DESIGN.md final
 - [ ] Demo video uploaded (unlisted is fine) and link in README
 - [ ] Submission sent before Sun Nov 15, 23:29 PKT (target: 21:00)
