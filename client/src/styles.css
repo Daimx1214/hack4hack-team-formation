@@ -1,0 +1,28 @@
+/* Minimal functional styling — polish is a later build step. */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #f6f7f9; color: #1c2333; }
+a { color: #2952cc; }
+.app { max-width: 960px; margin: 0 auto; padding: 16px; }
+.nav { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #dde1e8; margin-bottom: 24px; }
+.nav nav { display: flex; gap: 16px; align-items: center; }
+.brand { font-weight: 700; font-size: 20px; text-decoration: none; color: #1c2333; }
+.nav-user { font-weight: 600; }
+.link-button { background: none; border: none; color: #2952cc; cursor: pointer; font-size: 16px; padding: 0; }
+.card { background: #fff; border: 1px solid #dde1e8; border-radius: 10px; padding: 20px; }
+.form-card { max-width: 440px; margin: 0 auto; }
+.form-card form { display: flex; flex-direction: column; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+input, textarea { padding: 9px 10px; border: 1px solid #c3c9d4; border-radius: 6px; font-size: 15px; font-weight: 400; }
+button { background: #2952cc; color: #fff; border: none; border-radius: 6px; padding: 10px 16px; font-size: 15px; cursor: pointer; }
+button:disabled { opacity: 0.55; cursor: default; }
+button.danger { background: #b3261e; }
+.error { color: #b3261e; }
+.notice { color: #14532d; }
+.hint { color: #5b6472; }
+.team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.team-card { text-decoration: none; color: inherit; }
+.team-card:hover { border-color: #2952cc; }
+.seats { color: #14532d; font-weight: 600; }
+.full { color: #b3261e; font-weight: 600; }
+.skills { color: #5b6472; font-size: 14px; }
+.actions { display: flex; gap: 12px; margin-top: 16px; }
