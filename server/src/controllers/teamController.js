@@ -125,6 +125,12 @@ async function joinTeam(req, res) {
     // The atomic update matched nothing. No write happened, so correctness
     // is already guaranteed — this re-read only tells the caller WHY.
     const current = await Team.findById(teamId);
+    if (!current) {
+      // The team was deleted between the capacity read above and this
+      // re-read. That is a plain "not found" — without this guard the
+      // next line would dereference null and turn it into a 500.
+      return res.status(404).json({ error: 'Team not found' });
+    }
     const alreadyMember = current.members.some(
       (m) => m.user.toString() === userId.toString()
     );
