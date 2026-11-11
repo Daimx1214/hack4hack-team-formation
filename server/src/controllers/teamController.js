@@ -37,8 +37,12 @@ async function createTeam(req, res) {
 }
 
 // GET /api/teams — list all teams, newest first.
+// Read paths (list + get) POPULATE each member's user with name and email,
+// so clients can show "Alice (owner)" instead of a raw ObjectId. Write
+// responses (create/join/leave) keep the plain ids — membership semantics
+// are identical either way; only the read shape is friendlier.
 async function listTeams(req, res) {
-  const teams = await Team.find().sort({ createdAt: -1 });
+  const teams = await Team.find().populate('members.user', 'name email').sort({ createdAt: -1 });
   return res.status(200).json({ teams });
 }
 
@@ -47,7 +51,7 @@ async function getTeam(req, res) {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(404).json({ error: 'Team not found' });
   }
-  const team = await Team.findById(req.params.id);
+  const team = await Team.findById(req.params.id).populate('members.user', 'name email');
   if (!team) {
     return res.status(404).json({ error: 'Team not found' });
   }

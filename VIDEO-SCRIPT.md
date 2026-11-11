@@ -45,10 +45,11 @@ demo (Segment 4).
       the `joinTeam` function (Segment 4, second half).
 - [ ] Browser zoom ~125% so text is readable on video. Close notifications,
       bookmarks bar, and anything personal. Full-screen the browser.
-- [ ] Honest note: the **Members list on the team page shows member IDs**,
-      not names (the API returns user IDs). Narrate the **counter and the
-      badges** ("3/4 → 4/4", "1 seat left → FULL") — don't say "you can see
-      Dana's name in the list", because you can't.
+- [ ] Note: the **Members list on the team page shows member names**
+      (the GET endpoints populate each member's user). You can point at
+      the names while you narrate — and still narrate the **counter and
+      the badges** ("3/4 → 4/4", "1 seat left → FULL"), because those
+      numbers are the race-proofing made visible.
 
 ---
 

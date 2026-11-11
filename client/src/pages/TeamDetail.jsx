@@ -6,6 +6,12 @@ import { teamsApi } from '../api';
 // The 409 responses from the API ("Team is full", "Already a member") are
 // shown to the user as plain messages — that is the race-proofing working
 // as designed, not an error in the UI.
+
+// members.user is a populated user object ({ id, name, email }) in GET
+// responses, but a plain id string in join/leave responses. These helpers
+// hide that difference so the rest of the page doesn't have to care.
+const memberId = (m) => (typeof m.user === 'object' ? m.user.id : m.user);
+const memberName = (m) => (typeof m.user === 'object' ? m.user.name : m.user);
 export default function TeamDetail({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -34,7 +40,7 @@ export default function TeamDetail({ user }) {
   if (!team) return <p className="loading">Loading team…</p>;
 
   const isOwner = user && team.owner === user.id;
-  const isMember = user && team.members.some((m) => m.user === user.id);
+  const isMember = user && team.members.some((m) => memberId(m) === user.id);
   const seatsLeft = team.capacity - team.memberCount;
 
   async function handleJoin() {
@@ -42,9 +48,11 @@ export default function TeamDetail({ user }) {
     setNotice('');
     setActionError('');
     try {
-      const data = await teamsApi.join(id);
-      setTeam(data.team);
+      await teamsApi.join(id);
       setNotice('You joined the team.');
+      // Refetch instead of using the join response: GET returns the member
+      // list with populated names, the join response carries raw ids.
+      load();
     } catch (err) {
       // A 409 here ("Team is full" / "already a member") is the race-proofing
       // doing its job — show it as a clear banner and refresh the numbers.
@@ -60,9 +68,9 @@ export default function TeamDetail({ user }) {
     setNotice('');
     setActionError('');
     try {
-      const data = await teamsApi.leave(id);
-      setTeam(data.team);
+      await teamsApi.leave(id);
       setNotice('You left the team.');
+      load(); // refetch for the populated member names (see handleJoin)
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -99,8 +107,8 @@ export default function TeamDetail({ user }) {
       <h2>Members</h2>
       <ul className="member-list">
         {team.members.map((m) => (
-          <li key={m.user}>
-            {m.user}
+          <li key={memberId(m)}>
+            {memberName(m)}
             {m.role === 'owner' ? ' (owner)' : ''}
           </li>
         ))}

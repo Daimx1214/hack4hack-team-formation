@@ -49,7 +49,7 @@ describe('Concurrency: racing joins', () => {
     const finalTeam = check.body.team;
     expect(finalTeam.memberCount).toBe(3);
     expect(finalTeam.members).toHaveLength(3);
-    const memberIds = finalTeam.members.map((m) => m.user);
+    const memberIds = finalTeam.members.map((m) => m.user.id); // GET populates members.user
     expect(new Set(memberIds).size).toBe(3);
   });
 
@@ -76,7 +76,7 @@ describe('Concurrency: racing joins', () => {
     const finalTeam = check.body.team;
     expect(finalTeam.memberCount).toBe(2); // owner + racer, not owner + 5
     const appearances = finalTeam.members.filter(
-      (m) => m.user === racer.user.id
+      (m) => m.user.id === racer.user.id // GET populates members.user into an object
     );
     expect(appearances).toHaveLength(1);
   });
@@ -110,7 +110,7 @@ describe('Concurrency: racing joins', () => {
     const check = await request(app).get(`/api/teams/${team.id}`);
     const finalTeam = check.body.team;
     expect(finalTeam.memberCount).toBe(4);
-    const memberIds = finalTeam.members.map((m) => m.user);
+    const memberIds = finalTeam.members.map((m) => m.user.id); // GET populates members.user
     expect(new Set(memberIds).size).toBe(4); // every member appears exactly once
   });
 });
@@ -142,7 +142,7 @@ describe('Concurrency: racing leaves', () => {
     const check = await request(app).get(`/api/teams/${team.id}`);
     expect(check.body.team.memberCount).toBe(1);
     expect(check.body.team.members).toHaveLength(1);
-    expect(check.body.team.members[0].user).toBe(owner.user.id);
+    expect(check.body.team.members[0].user.id).toBe(owner.user.id);
   });
 
   it('handles every member leaving at the same time: counter ends at exactly 1 (the owner)', async () => {
@@ -222,7 +222,7 @@ describe('Concurrency: idempotency keys under racing retries', () => {
 
     const check = await request(app).get(`/api/teams/${team.id}`);
     expect(check.body.team.memberCount).toBe(2);
-    const appearances = check.body.team.members.filter((m) => m.user === joiner.user.id);
+    const appearances = check.body.team.members.filter((m) => m.user.id === joiner.user.id);
     expect(appearances).toHaveLength(1);
   });
 

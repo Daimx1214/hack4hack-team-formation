@@ -78,6 +78,27 @@ describe('GET /api/teams', () => {
     expect(res.body.team.id).toBe(team.id);
   });
 
+  it('returns member NAMES (populated users), not raw ids, in the team detail', async () => {
+    const owner = await registerUser(app, { name: 'Alice Owner' });
+    const joiner = await registerUser(app, { name: 'Bob Joiner' });
+    const team = await createTeam(app, owner.token, { capacity: 4 });
+    await joinAs(joiner.token, team.id);
+
+    const res = await request(app).get(`/api/teams/${team.id}`);
+
+    expect(res.status).toBe(200);
+    // Membership semantics are unchanged — same people, same count — but
+    // each member's `user` is now the populated user (id + name + email).
+    expect(res.body.team.memberCount).toBe(2);
+    expect(res.body.team.members).toHaveLength(2);
+    const byRole = Object.fromEntries(res.body.team.members.map((m) => [m.role, m.user]));
+    expect(byRole.owner.id).toBe(owner.user.id);
+    expect(byRole.owner.name).toBe('Alice Owner');
+    expect(byRole.member.id).toBe(joiner.user.id);
+    expect(byRole.member.name).toBe('Bob Joiner');
+    expect(byRole.member.email).toBe(joiner.user.email);
+  });
+
   it('returns 404 for a team that does not exist', async () => {
     const fakeId = new mongoose.Types.ObjectId().toString();
     const res = await request(app).get(`/api/teams/${fakeId}`);

@@ -224,12 +224,9 @@ only ever exists *within* one hot team document — which is precisely the
 case the conditional update serialises correctly.
 
 **Q10. What would you add with more time?**
-Three honest items, all already noted in my build plan: **(1) Pagination
+Two honest items, both already noted in my build plan: **(1) Pagination
 and filtering on `GET /api/teams`** — today it returns every team, newest
-first; fine for a demo, wrong for a real directory. **(2) Member names
-in team responses** — the API currently returns member *user IDs* and
-the UI shows those IDs; I'd `populate` the member user names (and move
-the owner check client-side onto the populated shape). **(3) The load
+first; fine for a demo, wrong for a real directory. **(2) The load
 test re-run against the deployed URL** — the local Artillery run is done
 (p95 10.1 ms, zero errors), and the same config needs its run against
 the live API so the submission numbers come from the real deployment.
