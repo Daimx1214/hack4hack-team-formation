@@ -20,17 +20,31 @@ async function register(req, res) {
 
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
-    return res.status(400).json({ error: 'Email is already registered' });
+    // 409 Conflict (not 400): the request itself is well-formed, it just
+    // collides with an account that already exists.
+    return res.status(409).json({ error: 'Email is already registered' });
   }
 
   // Note: the plain password is placed in passwordHash here on purpose —
   // the User model's pre-save hook replaces it with a bcrypt hash.
-  const user = await User.create({
-    name,
-    email,
-    passwordHash: password,
-    skills: Array.isArray(skills) ? skills : [],
-  });
+  let user;
+  try {
+    user = await User.create({
+      name,
+      email,
+      passwordHash: password,
+      skills: Array.isArray(skills) ? skills : [],
+    });
+  } catch (err) {
+    // Two registrations with the same email can race: both pass the
+    // findOne check above, then the unique index rejects the second
+    // insert. That is the same 409 the caller would have got sequentially
+    // — never a 500.
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Email is already registered' });
+    }
+    throw err;
+  }
 
   return res.status(201).json({ user, token: signToken(user._id) });
 }

@@ -179,7 +179,7 @@ Base path `/api`. All request/response bodies are JSON. Errors are
 
 | Method | Endpoint               | Auth | Success | Errors |
 | ------ | ---------------------- | ---- | ------- | ------ |
-| POST   | `/auth/register`       | –    | 201 `{ user, token }` | 400 validation / duplicate email |
+| POST   | `/auth/register`       | –    | 201 `{ user, token }` | 400 validation, 409 duplicate email |
 | POST   | `/auth/login`          | –    | 200 `{ user, token }` | 401 bad credentials |
 | GET    | `/auth/me`             | JWT  | 200 `{ user }` | 401 |
 | GET    | `/health`              | –    | 200 `{ status: "ok" }` | – |
@@ -215,6 +215,19 @@ Test files (in `server/tests/`):
     and the member list has no duplicates.
   - The same user fires 5 join requests in parallel → membership appears
     exactly once.
+  - Leave races: one member leaving 5 times in parallel decrements the
+    counter exactly once (never negative); all members leaving at once end
+    at exactly 1 (the owner).
+  - Idempotency under concurrency: a retry storm with one
+    `Idempotency-Key` creates exactly one membership; replays after a
+    recorded join all return the original result.
+  - Duplicate registration race: 5 parallel registrations with one email
+    create exactly one account (one `201`, the rest `409`).
+- `edge-cases.test.js` — duplicate email `409` (incl. different letter
+  case), wrong-secret and garbage tokens `401`, no-token `401` on join and
+  delete, join/leave/delete against deleted or nonexistent teams `404`,
+  malformed ids `404`, non-owner member delete `403`, and the capacity
+  boundaries (1, 0, 2.5 rejected; capacity 2 = owner + exactly one seat).
 
 Target: **20+ API tests**, all running in CI
 (`.github/workflows/ci.yml`) on every push and pull request.
