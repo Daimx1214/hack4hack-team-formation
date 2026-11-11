@@ -15,6 +15,7 @@ client/dist/
 # Test / load-test artifacts
 coverage/
 load-test/results/
+load/context.json
 
 # OS / editor noise
 .DS_Store

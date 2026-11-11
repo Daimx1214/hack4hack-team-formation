@@ -1,0 +1,24 @@
+TeamForge API — LOCAL load test results
+========================================
+Date: 2026-11-11T07:38:05.026Z
+Target: http://localhost:5055 (local machine — API, in-memory MongoDB and Artillery
+all running on the same small dev VM). These are LOCAL numbers;
+the submission proof is the same artillery.yml re-run against the
+deployed URL.
+
+Requests completed: 2029
+Request rate (mean): 52 req/s
+Response codes:
+  HTTP 200: 1667
+  HTTP 409: 362
+Errors: none
+
+Response time (ms):
+  min:  0
+  mean: 4.2
+  p50:  3
+  p95:  10.1
+  p99:  23.8
+  max:  59
+
+PS1 target: p95 < 200 ms.

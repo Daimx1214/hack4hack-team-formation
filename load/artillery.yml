@@ -1,0 +1,41 @@
+# Load test for the TeamForge API (see load/README.md for how to run).
+#
+# Two scenarios, weighted:
+#   - "Browse teams" (70%): read traffic — list teams, open the stampede
+#     team's detail page. These are the endpoints that must stay fast for
+#     everyone browsing during a deadline rush.
+#   - "Join stampede" (30%): POST joins against ONE team of capacity 10
+#     from a pool of 100 users. Only 9 joins can ever succeed (the owner
+#     holds seat #1); the rest correctly get 409 "Team is full" /
+#     "already a member". That is the PS1 stampede reproduced at load —
+#     the point is that every response is fast and none is a 5xx.
+#
+# Before running: node load/prepare.js  (creates users + team, writes
+# load/context.json, which processor.js reads).
+config:
+  target: "http://localhost:5000" # override with --target for the deployed API
+  phases:
+    - duration: 40 # seconds
+      arrivalRate: 30 # ~30 new virtual users per second, ~1200 total
+      name: "Steady load"
+  processor: "./processor.js"
+
+scenarios:
+  - name: "Browse teams"
+    weight: 7
+    flow:
+      - function: "pickUser" # sets {{ teamId }} (token unused here)
+      - get:
+          url: "/api/teams"
+      - get:
+          url: "/api/teams/{{ teamId }}"
+
+  - name: "Join stampede"
+    weight: 3
+    flow:
+      - function: "pickUser" # sets {{ teamId }} and a random user's {{ token }}
+      - post:
+          url: "/api/teams/{{ teamId }}/join"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json: {}
