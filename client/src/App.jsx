@@ -39,6 +39,7 @@ export default function App() {
       <header className="nav">
         <Link to="/" className="brand">
           TeamForge
+          <small>Race-proof team formation for hackathons</small>
         </Link>
         <nav>
           <Link to="/">Teams</Link>
@@ -68,6 +69,11 @@ export default function App() {
           <Route path="/create" element={<CreateTeam user={user} />} />
         </Routes>
       </main>
+
+      <footer className="footer">
+        <span>TeamForge — built for the Hack4Hack Crew Hiring Challenge 2026 (PS1).</span>
+        <span>Joins are atomic: a team can never over-fill, even in a stampede.</span>
+      </footer>
     </div>
   );
 }

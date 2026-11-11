@@ -39,7 +39,11 @@ export default function Login({ onAuth }) {
             required
           />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && (
+          <div className="banner banner-error" role="alert">
+            {error}
+          </div>
+        )}
         <button type="submit" disabled={busy}>
           {busy ? 'Logging in…' : 'Log in'}
         </button>

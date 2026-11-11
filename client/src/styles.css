@@ -1,28 +1,157 @@
-/* Minimal functional styling — polish is a later build step. */
+/* TeamForge — one plain stylesheet, no framework.
+   Layout: centred column, sticky-feeling header, card grid for teams,
+   pill "badges" for seat status, and banner boxes for messages so API
+   errors (e.g. a 409 "Team is full") are impossible to miss. */
+
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #f6f7f9; color: #1c2333; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #f4f6fa;
+  color: #1c2333;
+  line-height: 1.45;
+}
+
 a { color: #2952cc; }
-.app { max-width: 960px; margin: 0 auto; padding: 16px; }
-.nav { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #dde1e8; margin-bottom: 24px; }
+
+/* ---------- layout ---------- */
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main { flex: 1; }
+
+.footer {
+  margin-top: 40px;
+  padding: 16px 0 8px;
+  border-top: 1px solid #dde1e8;
+  color: #5b6472;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---------- header ---------- */
+
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #dde1e8;
+  margin-bottom: 24px;
+}
+
 .nav nav { display: flex; gap: 16px; align-items: center; }
-.brand { font-weight: 700; font-size: 20px; text-decoration: none; color: #1c2333; }
+.nav nav a { text-decoration: none; font-weight: 500; }
+.nav nav a:hover { text-decoration: underline; }
+
+.brand { font-weight: 800; font-size: 22px; text-decoration: none; color: #1c2333; letter-spacing: -0.02em; }
+.brand small { display: block; font-size: 12px; font-weight: 500; color: #5b6472; letter-spacing: 0; }
+
 .nav-user { font-weight: 600; }
-.link-button { background: none; border: none; color: #2952cc; cursor: pointer; font-size: 16px; padding: 0; }
-.card { background: #fff; border: 1px solid #dde1e8; border-radius: 10px; padding: 20px; }
+.link-button { background: none; border: none; color: #2952cc; cursor: pointer; font-size: 16px; padding: 0; font-weight: 500; }
+.link-button:hover { text-decoration: underline; }
+
+/* ---------- cards & forms ---------- */
+
+.card {
+  background: #fff;
+  border: 1px solid #dde1e8;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
 .form-card { max-width: 440px; margin: 0 auto; }
 .form-card form { display: flex; flex-direction: column; gap: 12px; }
+
 label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
-input, textarea { padding: 9px 10px; border: 1px solid #c3c9d4; border-radius: 6px; font-size: 15px; font-weight: 400; }
-button { background: #2952cc; color: #fff; border: none; border-radius: 6px; padding: 10px 16px; font-size: 15px; cursor: pointer; }
+input, textarea {
+  padding: 9px 10px;
+  border: 1px solid #c3c9d4;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 400;
+  background: #fff;
+}
+input:focus, textarea:focus { outline: 2px solid #2952cc33; border-color: #2952cc; }
+
+/* ---------- buttons ---------- */
+
+button {
+  background: #2952cc;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: #1f41a8; }
 button:disabled { opacity: 0.55; cursor: default; }
 button.danger { background: #b3261e; }
-.error { color: #b3261e; }
+button.danger:hover:not(:disabled) { background: #8f1d17; }
+
+.actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+
+/* ---------- messages: banners, notices, loading ---------- */
+
+/* Banners are the friendly face of API errors: a coloured box the user
+   cannot overlook, instead of bare red text. */
+.banner {
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.banner-error { background: #fdecea; border-color: #f3c1bd; color: #8f1d17; }
+.banner-success { background: #e6f4ea; border-color: #b7dfc2; color: #14532d; }
+
+.error { color: #b3261e; }       /* small inline errors (form fields) */
 .notice { color: #14532d; }
 .hint { color: #5b6472; }
-.team-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
-.team-card { text-decoration: none; color: inherit; }
+
+.loading { color: #5b6472; font-style: italic; padding: 24px 0; }
+
+/* ---------- teams ---------- */
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.team-card { text-decoration: none; color: inherit; display: block; }
 .team-card:hover { border-color: #2952cc; }
+.team-card h2 { margin-top: 0; }
+
+/* Seats-left pill shown on every team card and the detail page. */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.badge-open { background: #e6f4ea; color: #14532d; }
+.badge-few { background: #fef3c7; color: #92400e; }
+.badge-full { background: #fdecea; color: #8f1d17; }
+
 .seats { color: #14532d; font-weight: 600; }
 .full { color: #b3261e; font-weight: 600; }
 .skills { color: #5b6472; font-size: 14px; }
-.actions { display: flex; gap: 12px; margin-top: 16px; }
+
+.member-list { padding-left: 20px; }
+.member-list li { margin: 4px 0; }

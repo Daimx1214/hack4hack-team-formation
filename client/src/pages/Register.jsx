@@ -61,7 +61,11 @@ export default function Register({ onAuth }) {
             placeholder="React, Node.js, MongoDB"
           />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && (
+          <div className="banner banner-error" role="alert">
+            {error}
+          </div>
+        )}
         <button type="submit" disabled={busy}>
           {busy ? 'Creating account…' : 'Register'}
         </button>

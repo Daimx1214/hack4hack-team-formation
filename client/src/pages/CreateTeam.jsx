@@ -70,7 +70,11 @@ export default function CreateTeam({ user }) {
             placeholder="React, Python"
           />
         </label>
-        {error && <p className="error">{error}</p>}
+        {error && (
+          <div className="banner banner-error" role="alert">
+            {error}
+          </div>
+        )}
         <button type="submit" disabled={busy}>
           {busy ? 'Creating…' : 'Create team'}
         </button>

@@ -16,8 +16,14 @@ export default function Teams() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>Loading teams…</p>;
-  if (error) return <p className="error">{error}</p>;
+  if (loading) return <p className="loading">Loading teams…</p>;
+  if (error) {
+    return (
+      <div className="banner banner-error" role="alert">
+        Could not load the teams: {error}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -30,9 +36,15 @@ export default function Teams() {
             <Link key={team.id} to={`/teams/${team.id}`} className="card team-card">
               <h2>{team.name}</h2>
               <p>{team.description || 'No description.'}</p>
-              <p className={seatsLeft === 0 ? 'full' : 'seats'}>
-                {team.memberCount}/{team.capacity} members
-                {seatsLeft === 0 ? ' — FULL' : ` — ${seatsLeft} seat(s) left`}
+              <p>
+                {team.memberCount}/{team.capacity} members{' '}
+                <span
+                  className={`badge ${
+                    seatsLeft === 0 ? 'badge-full' : seatsLeft === 1 ? 'badge-few' : 'badge-open'
+                  }`}
+                >
+                  {seatsLeft === 0 ? 'FULL' : `${seatsLeft} seat${seatsLeft === 1 ? '' : 's'} left`}
+                </span>
               </p>
               {team.skillsNeeded?.length > 0 && (
                 <p className="skills">Looking for: {team.skillsNeeded.join(', ')}</p>
