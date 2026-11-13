@@ -12,6 +12,7 @@ import Teams from './pages/Teams';
 import TeamDetail from './pages/TeamDetail';
 import CreateTeam from './pages/CreateTeam';
 import EditTeam from './pages/EditTeam';
+import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
 // Reset the scroll position on every navigation. Hash links (e.g.
@@ -86,6 +87,14 @@ function AppShell() {
             element={
               <ProtectedRoute user={user} sessionReady={sessionReady}>
                 <CreateTeam user={user} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute user={user} sessionReady={sessionReady}>
+                <Dashboard user={user} />
               </ProtectedRoute>
             }
           />
