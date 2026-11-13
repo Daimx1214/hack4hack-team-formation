@@ -33,8 +33,10 @@ export default function Register({ onAuth }) {
   }
 
   return (
+    <div className="container">
     <div className="card form-card">
       <h1>Create your account</h1>
+      <p className="hint">Join TeamForge to create a team or claim a seat in one.</p>
       <form onSubmit={handleSubmit}>
         <label>
           Name
@@ -73,6 +75,7 @@ export default function Register({ onAuth }) {
       <p>
         Already registered? <Link to="/login">Log in</Link>
       </p>
+    </div>
     </div>
   );
 }

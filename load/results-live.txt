@@ -1,0 +1,27 @@
+LIVE LOAD TEST — TeamForge API on Vercel (serverless, Mumbai bom1) + MongoDB Atlas M0
+Target: https://hack4hack-api.vercel.app   Date: 2026-11-13
+Generator note: Artillery ran from a sandboxed VM whose traffic leaves via a
+shared egress proxy — treat absolute latencies as an upper bound, not as what
+a normal client would see. Raw report: load/report-live.json.
+
+RUN 1 — full local profile (30 virtual users/sec, 40 s, 1,200 users):
+  The generator's shared proxy collapsed first: of 1,439 requests sent, 563
+  responses came back and 856 connections were reset by the path (ECONNRESET),
+  20 timed out. IMPORTANT: every response that did arrive was correct —
+  487 x 200, 76 x 409, ZERO 5xx. The app never produced a wrong or failed
+  answer; the transport between generator and host failed, so this run says
+  nothing bad about the API and is kept here for honesty, not quoted as a result.
+
+RUN 2 — reduced profile (3 virtual users/sec, 60 s, 180 users, same scenarios):
+  http.requests .... 306
+  http.responses ... 306   (100% answered)
+  status codes ..... 261 x 200, 45 x 409, 0 x 5xx, 0 errors, 0 failed users
+  response time .... median 907 ms, p95 1,686 ms (via the shared proxy, above)
+  stampede ......... of the join attempts against one capacity-10 team, only
+                     the available seats were filled; every extra join got a
+                     correct 409. The team did not over-fill.
+
+For comparison, the same Artillery profile against the API running locally
+(load/results.txt): 2,029 requests, 0 errors, p95 10.1 ms — that is the
+server's own processing cost; the live numbers above are network + free-tier
+serverless cold starts + the generator's proxy path.

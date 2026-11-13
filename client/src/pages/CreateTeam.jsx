@@ -11,7 +11,13 @@ export default function CreateTeam({ user }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  if (!user) return <p>Please log in to create a team.</p>;
+  if (!user) {
+    return (
+      <div className="container">
+        <p>Please log in to create a team.</p>
+      </div>
+    );
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -36,6 +42,7 @@ export default function CreateTeam({ user }) {
   }
 
   return (
+    <div className="container">
     <div className="card form-card">
       <h1>Create a team</h1>
       <p className="hint">
@@ -79,6 +86,7 @@ export default function CreateTeam({ user }) {
           {busy ? 'Creating…' : 'Create team'}
         </button>
       </form>
+    </div>
     </div>
   );
 }

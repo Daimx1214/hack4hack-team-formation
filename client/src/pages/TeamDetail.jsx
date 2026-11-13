@@ -12,6 +12,25 @@ import { teamsApi } from '../api';
 // hide that difference so the rest of the page doesn't have to care.
 const memberId = (m) => (typeof m.user === 'object' ? m.user.id : m.user);
 const memberName = (m) => (typeof m.user === 'object' ? m.user.name : m.user);
+
+// Same flat colour set as the team tiles on the home page.
+const AVATAR_COLORS = ['#1c5fd6', '#0f766e', '#b45309', '#334155', '#9d2c4a', '#2f5d8a'];
+
+function avatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+function initials(name) {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
 export default function TeamDetail({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -32,8 +51,10 @@ export default function TeamDetail({ user }) {
 
   if (error) {
     return (
-      <div className="banner banner-error" role="alert">
-        Could not load this team: {error}
+      <div className="container">
+        <div className="banner banner-error" role="alert">
+          Could not load this team: {error}
+        </div>
       </div>
     );
   }
@@ -42,6 +63,7 @@ export default function TeamDetail({ user }) {
   const isOwner = user && team.owner === user.id;
   const isMember = user && team.members.some((m) => memberId(m) === user.id);
   const seatsLeft = team.capacity - team.memberCount;
+  const fillPct = Math.round((team.memberCount / team.capacity) * 100);
 
   async function handleJoin() {
     setBusy(true);
@@ -90,62 +112,91 @@ export default function TeamDetail({ user }) {
   }
 
   return (
-    <div className="card">
-      <h1>{team.name}</h1>
-      <p>{team.description || 'No description.'}</p>
-      <p>
-        {team.memberCount}/{team.capacity} members{' '}
-        <span
-          className={`badge ${
-            seatsLeft === 0 ? 'badge-full' : seatsLeft === 1 ? 'badge-few' : 'badge-open'
-          }`}
-        >
-          {seatsLeft === 0 ? 'FULL' : `${seatsLeft} seat${seatsLeft === 1 ? '' : 's'} left`}
-        </span>
-      </p>
+    <div className="container">
+      <div className="card detail-card">
+        <h1>{team.name}</h1>
+        <p className="detail-desc">{team.description || 'No description.'}</p>
 
-      <h2>Members</h2>
-      <ul className="member-list">
-        {team.members.map((m) => (
-          <li key={memberId(m)}>
-            {memberName(m)}
-            {m.role === 'owner' ? ' (owner)' : ''}
-          </li>
-        ))}
-      </ul>
+        <div className="detail-seats">
+          <span className="count">
+            {team.memberCount}/{team.capacity} members
+          </span>
+          <div
+            className="meter"
+            role="img"
+            aria-label={`${team.memberCount} of ${team.capacity} seats filled`}
+          >
+            <div
+              className={`meter-fill ${seatsLeft === 0 ? 'full' : seatsLeft === 1 ? 'few' : ''}`}
+              style={{ width: `${fillPct}%` }}
+            />
+          </div>
+          <span
+            className={`badge ${
+              seatsLeft === 0 ? 'badge-full' : seatsLeft === 1 ? 'badge-few' : 'badge-open'
+            }`}
+          >
+            {seatsLeft === 0 ? 'FULL' : `${seatsLeft} seat${seatsLeft === 1 ? '' : 's'} left`}
+          </span>
+        </div>
 
-      {notice && (
-        <div className="banner banner-success" role="status">
-          {notice}
-        </div>
-      )}
-      {actionError && (
-        <div className="banner banner-error" role="alert">
-          {actionError}
-        </div>
-      )}
+        {team.skillsNeeded?.length > 0 && (
+          <div className="chips" style={{ marginBottom: 20 }}>
+            <span className="chip-label">Looking for:</span>
+            {team.skillsNeeded.map((skill) => (
+              <span key={skill} className="chip">
+                {skill}
+              </span>
+            ))}
+          </div>
+        )}
 
-      {user ? (
-        <div className="actions">
-          {!isMember && (
-            <button type="button" onClick={handleJoin} disabled={busy || seatsLeft === 0}>
-              {busy ? 'Joining…' : seatsLeft === 0 ? 'Team full' : 'Join team'}
-            </button>
-          )}
-          {isMember && !isOwner && (
-            <button type="button" onClick={handleLeave} disabled={busy}>
-              {busy ? 'Leaving…' : 'Leave team'}
-            </button>
-          )}
-          {isOwner && (
-            <button type="button" onClick={handleDelete} className="danger">
-              Delete team
-            </button>
-          )}
-        </div>
-      ) : (
-        <p>Log in to join this team.</p>
-      )}
+        <h2>Members</h2>
+        <ul className="member-list">
+          {team.members.map((m) => (
+            <li key={memberId(m)} className="member-row">
+              <span className="avatar" style={{ background: avatarColor(memberName(m)) }}>
+                {initials(memberName(m))}
+              </span>
+              <span className="member-name">{memberName(m)}</span>
+              {m.role === 'owner' && <span className="tag-owner">Owner</span>}
+            </li>
+          ))}
+        </ul>
+
+        {notice && (
+          <div className="banner banner-success" role="status">
+            {notice}
+          </div>
+        )}
+        {actionError && (
+          <div className="banner banner-error" role="alert">
+            {actionError}
+          </div>
+        )}
+
+        {user ? (
+          <div className="actions">
+            {!isMember && (
+              <button type="button" onClick={handleJoin} disabled={busy || seatsLeft === 0}>
+                {busy ? 'Joining…' : seatsLeft === 0 ? 'Team full' : 'Join team'}
+              </button>
+            )}
+            {isMember && !isOwner && (
+              <button type="button" onClick={handleLeave} disabled={busy} className="ghost">
+                {busy ? 'Leaving…' : 'Leave team'}
+              </button>
+            )}
+            {isOwner && (
+              <button type="button" onClick={handleDelete} className="danger">
+                Delete team
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="hint">Log in to join this team.</p>
+        )}
+      </div>
     </div>
   );
 }

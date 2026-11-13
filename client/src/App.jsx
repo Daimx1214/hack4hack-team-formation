@@ -37,27 +37,34 @@ export default function App() {
   return (
     <div className="app">
       <header className="nav">
-        <Link to="/" className="brand">
-          TeamForge
-          <small>Race-proof team formation for hackathons</small>
-        </Link>
-        <nav>
-          <Link to="/">Teams</Link>
-          {user && <Link to="/create">Create team</Link>}
-          {user ? (
-            <>
-              <span className="nav-user">{user.name}</span>
-              <button type="button" onClick={handleLogout} className="link-button">
-                Log out
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login">Log in</Link>
-              <Link to="/register">Register</Link>
-            </>
-          )}
-        </nav>
+        <div className="nav-inner">
+          <Link to="/" className="brand">
+            <span className="brand-mark">TF</span>
+            <span className="brand-text">
+              TeamForge
+              <small>Race-proof team formation for hackathons</small>
+            </span>
+          </Link>
+          <nav>
+            <Link to="/">Teams</Link>
+            {user && <Link to="/create">Create team</Link>}
+            {user ? (
+              <>
+                <span className="nav-user">{user.name}</span>
+                <button type="button" onClick={handleLogout} className="link-button">
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login">Log in</Link>
+                <Link to="/register" className="btn-nav">
+                  Register
+                </Link>
+              </>
+            )}
+          </nav>
+        </div>
       </header>
 
       <main>
@@ -71,8 +78,12 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        <span>TeamForge — built for the Hack4Hack Crew Hiring Challenge 2026 (PS1).</span>
-        <span>Joins are atomic: a team can never over-fill, even in a stampede.</span>
+        <div className="footer-inner">
+          <span>
+            <strong>TeamForge</strong> — built for the Hack4Hack Crew Hiring Challenge 2026 (PS1).
+          </span>
+          <span>Joins are atomic: a team can never over-fill, even in a stampede.</span>
+        </div>
       </footer>
     </div>
   );
