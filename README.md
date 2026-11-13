@@ -7,6 +7,16 @@ the server at exactly the same moment.
 
 Built for the **Hack4Hack Crew Hiring Challenge 2026, Problem Statement 1**.
 
+## Live demo
+
+- **Web app:** https://hack4hack-web.vercel.app
+- **API:** https://hack4hack-api.vercel.app (health check: `/api/health`)
+- Log in with any demo account from §5 below (password `demo1234`).
+
+Deployed Nov 13, 2026, entirely on free tiers: the API runs as Vercel
+serverless functions pinned to Mumbai (`bom1`), next to the database on
+MongoDB Atlas (M0); the client is a Vercel static build.
+
 ## Why this is interesting
 
 The naive way to add a member is:
@@ -129,8 +139,13 @@ all sharing one small dev VM): 2,029 requests at ~52 req/s — 1,667 × 200,
 362 × 409 (the stampede's losing joins, by design), **zero errors**,
 **p95 = 10.1 ms** against the PS1 target of p95 < 200 ms.
 Full numbers in `load/results-local.txt`; how it works in `load/README.md`.
-The same `load/artillery.yml` gets re-run against the deployed URL for
-the submission numbers.
+
+**Live run** (Nov 13, 2026, against the deployed API): the reduced profile
+answered **306 of 306 requests with zero 5xx errors** — the stampede joins
+beyond capacity all returned a correct 409 and the team did not over-fill.
+The full-intensity profile saturated the load generator's own network path
+before it could stress the API; both runs, with their conditions, are
+recorded honestly in `load/results-live.txt`.
 
 ## API summary
 

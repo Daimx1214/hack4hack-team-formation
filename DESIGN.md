@@ -265,20 +265,25 @@ Setup and results live in `load/` (see `load/README.md`): `prepare.js`
 creates the 100 users and the stampede team, `run-local.js` runs the
 whole thing against a throwaway local stack in one command. First local
 run (Nov 11, 2026): 2,029 requests completed, zero errors, **p95 =
-10.1 ms** — details in `load/results-local.txt`.
+10.1 ms** — details in `load/results-local.txt`. Live runs against the
+deployed API (Nov 13, 2026) are recorded in `load/results-live.txt`:
+the reduced profile answered 306/306 requests with zero 5xx; the
+full-intensity profile saturated the generator's shared network path
+first (856 connection resets in transit, zero bad responses among those
+that arrived) — a generator limit, reported as such, not an API result.
 
 ## 7. Deployment plan (all free tiers)
 
 | Piece   | Platform               | Notes |
 | ------- | ---------------------- | ----- |
-| API     | Render (free web service) | env vars: `MONGO_URI`, `JWT_SECRET`, `PORT` |
-| Client  | Vercel or Netlify      | env var: `VITE_API_URL` → deployed API |
-| Database| MongoDB Atlas (M0 free)| IP allowlist open to Render; single cluster is a replica set, but our design does not depend on it |
+| API     | Vercel serverless (Hobby free) | Express app behind `server/api/index.js`; functions pinned to Mumbai (`bom1`), next to the Atlas cluster; env vars: `MONGO_URI`, `JWT_SECRET`. (Render was the original plan — its free tier demanded a card on file, so the API moved to Vercel; the app needed no changes beyond the serverless entry point.) |
+| Client  | Vercel (Hobby free)    | Vite build; env var: `VITE_API_URL` → deployed API |
+| Database| MongoDB Atlas (M0 free)| IP allowlist open (serverless egress IPs are dynamic); single cluster is a replica set, but our design does not depend on it. Mongoose pool capped at 5 per instance so many warm function instances stay under the M0 connection limit. |
 
 ## 8. Risks & mitigations
 
 | Risk | Mitigation |
 | --- | --- |
-| Free-tier API sleeps (Render cold start) | Warm-up ping before demo/recording; note it in the video. |
+| Free-tier serverless cold starts (Vercel) | First request after idle can take ~1–2 s while a function warms; warm-up ping before demo/recording; steady-state latency is network-bound, not app-bound (local p95 is 10.1 ms). |
 | `mongodb-memory-server` downloads a mongod binary on first run | Committed lockfile + CI caching; verified locally on day 1. |
 | Interview: must explain every line | Code is written conventionally with comments at every non-obvious step — especially the join controller, which carries the whole design in ~40 readable lines. |

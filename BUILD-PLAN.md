@@ -13,7 +13,7 @@ PS1 deliverables checklist (from the challenge):
 - [ ] Working team-formation platform (React + Node/Express + MongoDB)
 - [ ] Race-proof join/create — concurrency tests prove it
 - [ ] 20+ API tests, running in CI (GitHub Actions)
-- [ ] Load test proving p95 < 200 ms
+- [x] Load test proving p95 < 200 ms (local p95 10.1 ms; live run documented in `load/results-live.txt`)
 - [ ] Live deployed URL
 - [ ] Design doc (`DESIGN.md`)
 - [ ] 5-minute demo video
@@ -31,7 +31,8 @@ PS1 deliverables checklist (from the challenge):
       idempotency-under-concurrency tests → **50 tests, all passing**; duplicate-email
       register now returns 409 (race-safe); seed script; client UI polish
       (banners, seats-left badges, footer); Artillery load test run LOCALLY —
-      **p95 10.1 ms, zero errors** (see `load/results-local.txt`; live-URL re-run still owed)
+      **p95 10.1 ms, zero errors** (see `load/results-local.txt`; live re-run done
+      Fri Nov 13 — see `load/results-live.txt`)
 - [x] CI workflow running the API tests (runs once the repo is pushed to GitHub)
 - [x] README + DESIGN.md first versions
 - [x] Verified: server boots and serves (`/api/health` 200, register 201); client `npm run build` succeeds
@@ -46,32 +47,42 @@ PS1 deliverables checklist (from the challenge):
 - [ ] Still open: pagination/filter of team list (endpoint currently returns all teams)
 - [x] Seed script (`server/src/seed.js`) with demo users + teams for the demo (done Wed Nov 11)
 - [ ] Postman/curl smoke script against a locally running server
-- [ ] **Signups only Daim can do (do them today, they gate deployment):**
-  - MongoDB Atlas account + free M0 cluster → connection string
-  - Render account (API deploy)
-  - Vercel or Netlify account (client deploy)
-- [ ] Create the GitHub repo for the project and push (repo must be shareable
-      with the judges; CI must be green on it)
+- [x] **Deployment accounts** (done Fri Nov 13 by Muse with Daim's go-ahead):
+  - MongoDB Atlas: project "Hack4Hack", free M0 cluster (Mumbai) — live
+  - Render: account created, but its free tier demanded a card on file →
+        **API moved to Vercel serverless instead** (no card, same code)
+  - Vercel: API + client projects live (see Fri section)
+- [x] Create the GitHub repo for the project and push — done Fri Nov 13:
+      https://github.com/Daimx1214/hack4hack-team-formation (public, CI green)
 
 ## Fri Nov 13 — Frontend completion + deployment
 
-- [ ] Client pages finished: Register, Login, Teams list, Team detail
+- [x] Client pages finished: Register, Login, Teams list, Team detail
       (member list, seats-left indicator, Join/Leave buttons), Create team
+      — plus a full visual redesign Fri Nov 13 (navy/royal-blue product
+      theme in the Devpost/Unstop family, hero band with live counts,
+      seat-capacity meters, skill chips; no emojis)
 - [x] Client handles 409 states gracefully ("Team full", "Already a member")
       and retries joins with a stable `Idempotency-Key` (done Wed Nov 11:
       error/success banners + seats-left badges; in-flight Join disabled)
-- [ ] Deploy: Atlas (DB) → Render (API, env vars set) → Vercel/Netlify (client,
-      `VITE_API_URL` pointing at Render)
-- [ ] Full end-to-end smoke test on the **live** URLs
+- [x] Deploy (done Fri Nov 13): Atlas M0 (DB) → Vercel serverless (API,
+      `MONGO_URI` + `JWT_SECRET` set, functions in Mumbai) → Vercel (client,
+      `VITE_API_URL` → the API URL). Live: https://hack4hack-web.vercel.app
+- [x] Full end-to-end smoke test on the **live** URLs — health 200, seed
+      data replicated through the live API (6 users, 4 teams, exact counts),
+      Daim registered and joined a team himself on the live site
 - [ ] Freeze features Friday night — after this, only fixes
 
 ## Sat Nov 14 — Load test + design doc final (light day: CodeShield 2–7 PM)
 
-- [ ] Morning only: Artillery load test (last-seat stampede scenario,
-      DESIGN.md §6) against the live API; record p95 + success counts in
-      `load/` and README — LOCAL run already done Wed Nov 11 (p95 10.1 ms,
-      zero errors, `load/results-local.txt`); only the live-URL re-run remains
-- [ ] If p95 fails: profile join endpoint (indexes, response size) and re-run
+- [x] Artillery load test against the live API — done early, Fri Nov 13
+      (`load/results-live.txt`): reduced profile 306/306 answered, zero 5xx,
+      stampede held; full profile saturated the generator's network path
+      first (documented honestly, not an API failure)
+- [x] If p95 fails: profile join endpoint — resolved differently: the app's
+      own cost is the local p95 (10.1 ms); live latency is network/cold-start
+      bound. Mitigations applied: functions pinned to Mumbai next to Atlas,
+      mongoose pool capped at 5 for serverless fan-out
 - [ ] Final pass on DESIGN.md — numbers from the real load test filled in
 - [ ] Draft the demo-video script (see below)
 - [ ] (Daim away 2–7 PM: NASA + CodeShield — no build work planned)

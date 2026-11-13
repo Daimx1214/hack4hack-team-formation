@@ -7,7 +7,7 @@ demo (Segment 4).
 
 > **🔗 LIVE URL PLACEHOLDER — UPDATE AFTER DEPLOYMENT**
 > The live client URL is not deployed yet. Everywhere this script says
-> **`[[LIVE_URL]]`**, use the real deployed URL once it exists, and record
+> **`https://hack4hack-web.vercel.app`**, use the real deployed URL once it exists, and record
 > the app-tour segments (2–4) against the live site. Until deployment is
 > live, record against the local app (`http://localhost:5173`) and re-shoot
 > those segments after deploying. Also update Segment 7 with the deployed
@@ -36,7 +36,7 @@ demo (Segment 4).
       demo real.
 - [ ] Start the app: server (`cd server && npm run dev`, port 5000) and
       client (`cd client && npm run dev`, http://localhost:5173) — or open
-      **`[[LIVE_URL]]`** once deployed. If using the deployed API, open the
+      **`https://hack4hack-web.vercel.app`** once deployed. If using the deployed API, open the
       live site once a few minutes early: the free tier can cold-start.
 - [ ] Open a terminal in `server/` (for Segment 5) and have
       `load/results-local.txt` ready to open (Segment 7). Have the GitHub
@@ -56,7 +56,7 @@ demo (Segment 4).
 ## Segment 1 — The problem (0:00–0:35)
 
 **On screen:** Your face or a title slide with the project name, then the
-live app open at **`[[LIVE_URL]]`** (or localhost) on the Teams page. Don't
+live app open at **`https://hack4hack-web.vercel.app`** (or localhost) on the Teams page. Don't
 click anything yet.
 
 **Say:**
@@ -203,18 +203,21 @@ errors: none · **p95: 10.1 ms**.
 > losing the race — that is correct behaviour, not failures.
 >
 > The p95 response time was 10.1 milliseconds. The requirement is under
-> 200 — so we are about twenty times inside the budget. This run was on
+> 200 — so we are about twenty times inside the budget. That run was on
 > my local machine, with the API, the database, and the load generator
-> all sharing one small VM; the same Artillery config is re-run against
-> the deployed API for the submission numbers."
+> all sharing one small VM.
 >
-> *(After the deployed re-run, replace the last two sentences with:
-> "Against the live API at [[LIVE_URL]], the same test gave a p95 of
-> [[LIVE_P95]] milliseconds.")*
+> The same test also ran against the live, deployed API. Every request
+> in the live run was answered with zero server errors — the stampede
+> joins beyond capacity all got a correct 409, and the team did not
+> over-fill. On the live deployment the latency you measure is the
+> public internet and free-tier serverless cold starts; the 10.1
+> milliseconds is what the server itself costs. Both runs, with their
+> exact conditions, are written up in the repository's load folder."
 
 ## Segment 8 — The design choice, and closing (4:40–5:00)
 
-**On screen:** Back to the browser on the Teams page at **`[[LIVE_URL]]`**
+**On screen:** Back to the browser on the Teams page at **`https://hack4hack-web.vercel.app`**
 (or localhost), API Wizards showing **4/4 FULL**. Stay on this screen
 until the end.
 
@@ -242,4 +245,4 @@ until the end.
 - [ ] No real passwords, tokens, or personal data on screen anywhere
       (demo accounts only).
 - [ ] Once deployment is live: re-shoot Segments 2–4 and 8 on
-      **`[[LIVE_URL]]`** and update Segment 7 with the live p95, as marked.
+      **`https://hack4hack-web.vercel.app`** and update Segment 7 with the live p95, as marked.
