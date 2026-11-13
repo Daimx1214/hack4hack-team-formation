@@ -1,151 +1,212 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Plus, Search, SearchX } from 'lucide-react';
 import { teamsApi } from '../api';
+import Button from '../components/ui/Button';
+import TeamCard from '../components/teams/TeamCard';
+import { EmptyState, Pagination, TeamCardSkeleton } from '../components/ui/misc';
+import { useToast } from '../components/ui/Toast';
 
-// Flat tile colours for team initials — one per team, picked by a stable
-// hash of the team name so a team keeps its colour between visits.
-const TILE_COLORS = ['#1c5fd6', '#0f766e', '#b45309', '#334155', '#9d2c4a', '#2f5d8a'];
+// Browse teams (Build Spec §5.3): all state lives in the URL
+// (?q=&status=&sort=&page=) so links are shareable and Back works.
+// Search is debounced 300ms. Joins happen in place on the card; the
+// server response replaces the card's team (source of truth), and the
+// §5.8 toast copy is used for each outcome.
 
-function tileColor(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  return TILE_COLORS[hash % TILE_COLORS.length];
-}
+const PAGE_SIZE = 12;
+const STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'open', label: 'Open' },
+  { value: 'full', label: 'Full' },
+];
 
-function initials(name) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase();
-}
-
-function seatBadge(seatsLeft) {
-  if (seatsLeft === 0) return <span className="badge badge-full">FULL</span>;
-  if (seatsLeft === 1) return <span className="badge badge-few">1 seat left</span>;
-  return <span className="badge badge-open">{seatsLeft} seats left</span>;
-}
-
-// Home page: hero band with live counts, then the grid of all teams with
-// a seats-left indicator and a capacity meter on every card.
 export default function Teams({ user }) {
-  const [teams, setTeams] = useState([]);
+  const [params, setParams] = useSearchParams();
+  const q = params.get('q') || '';
+  const status = params.get('status') || '';
+  const sort = params.get('sort') || 'newest';
+  const page = Math.max(1, parseInt(params.get('page') || '1', 10) || 1);
+
+  const [searchInput, setSearchInput] = useState(q);
+  const [teams, setTeams] = useState(null);
+  const [meta, setMeta] = useState(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [joiningId, setJoiningId] = useState(null);
+  const toast = useToast();
+  const navigate = useNavigate();
+  const debounce = useRef(null);
+
+  const load = useCallback(() => {
+    setError('');
+    teamsApi
+      .list({ q: q || undefined, status: status || undefined, sort, page, limit: PAGE_SIZE })
+      .then((data) => {
+        setTeams(data.data);
+        setMeta(data.meta);
+      })
+      .catch(() => {
+        setTeams([]);
+        setError('Teams could not be loaded. Check your connection and try again.');
+      });
+  }, [q, status, sort, page]);
 
   useEffect(() => {
-    teamsApi
-      .list({ limit: 50 })
-      .then((data) => setTeams(data.data))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+    setTeams(null);
+    load();
+  }, [load]);
 
-  const openSeats = teams.reduce((sum, t) => sum + Math.max(0, t.capacity - t.memberCount), 0);
-  const totalMembers = teams.reduce((sum, t) => sum + t.memberCount, 0);
+  // Keep the input in sync when the URL changes elsewhere (Back button).
+  useEffect(() => {
+    setSearchInput(q);
+  }, [q]);
+
+  function updateParams(next) {
+    setParams((prev) => {
+      const merged = new URLSearchParams(prev);
+      Object.entries(next).forEach(([key, value]) => {
+        if (value === '' || value === undefined || value === null) merged.delete(key);
+        else merged.set(key, String(value));
+      });
+      return merged;
+    });
+  }
+
+  function onSearchChange(value) {
+    setSearchInput(value);
+    clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => updateParams({ q: value, page: '' }), 300);
+  }
+
+  async function quickJoin(team) {
+    setJoiningId(team.id);
+    try {
+      const data = await teamsApi.join(team.id);
+      setTeams((current) => current.map((t) => (t.id === team.id ? data.team : t)));
+      toast.success(`You joined ${team.name}.`);
+    } catch (err) {
+      if (err.code === 'TEAM_FULL') {
+        // Flip the card to Full immediately (Spec §5.3/§5.8).
+        setTeams((current) =>
+          current.map((t) => (t.id === team.id ? { ...t, seatsLeft: 0, isFull: true, memberCount: t.capacity } : t))
+        );
+        toast.warning('This team just filled up. Pick another one.');
+      } else if (err.code === 'ALREADY_MEMBER') {
+        toast.info("You're already in this team.");
+        load();
+      } else if (err.code === 'RATE_LIMITED') {
+        toast.error('Too many attempts. Try again in a minute.');
+      } else {
+        toast.error(err.message || 'Something went wrong on our side.');
+      }
+    } finally {
+      setJoiningId(null);
+    }
+  }
+
+  const hasFilters = q !== '' || status !== '';
 
   return (
-    <div>
-      <section className="hero">
-        <div className="hero-inner">
-          <h1>Find a team. Join it once. The seat is yours.</h1>
-          <p>
-            TeamForge matches hackathon participants into teams with fixed capacity. Every join is
-            a single atomic operation on the server, so a team can never over-fill — no matter how
-            many people click Join at the same second.
-          </p>
-          <div className="hero-row">
-            <Link to={user ? '/create' : '/register'} className="btn-hero">
-              {user ? 'Create a team' : 'Register to get started'}
-            </Link>
-            <div className="hero-stats">
-              <div className="hero-stat">
-                <strong>{loading ? '–' : teams.length}</strong>
-                <span>Teams</span>
-              </div>
-              <div className="hero-stat">
-                <strong>{loading ? '–' : openSeats}</strong>
-                <span>Open seats</span>
-              </div>
-              <div className="hero-stat">
-                <strong>{loading ? '–' : totalMembers}</strong>
-                <span>Members</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+    <div className="page">
       <div className="container">
-        <div className="section-head">
-          <h2>Teams looking for members</h2>
-          <p className="hint">Seats update the moment someone joins.</p>
+        <div className="browse-head">
+          <div>
+            <h1 className="h1">Teams</h1>
+            <p className="muted">Every team here has a fixed size. When it fills, it fills — no exceptions.</p>
+          </div>
+          <Link to={user ? '/teams/new' : '/login?returnTo=/teams/new'}>
+            <Button>
+              <Plus size={16} aria-hidden="true" /> Create team
+            </Button>
+          </Link>
         </div>
 
-        {loading && <p className="loading">Loading teams…</p>}
-        {error && (
-          <div className="banner banner-error" role="alert">
-            Could not load the teams: {error}
+        <div className="toolbar">
+          <div className="search-wrap">
+            <Search aria-hidden="true" />
+            <input
+              className="input"
+              type="search"
+              placeholder="Search teams"
+              value={searchInput}
+              onChange={(e) => onSearchChange(e.target.value)}
+              aria-label="Search teams"
+            />
           </div>
-        )}
-        {!loading && !error && teams.length === 0 && (
-          <div className="card empty-state">
-            <h3>No teams yet</h3>
-            <p>Be the first to create one — it takes less than a minute.</p>
+          <div className="seg-filter" role="group" aria-label="Filter by status">
+            {STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.label}
+                type="button"
+                aria-pressed={status === opt.value}
+                onClick={() => updateParams({ status: opt.value, page: '' })}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
+          <select
+            className="sort-select"
+            value={sort}
+            onChange={(e) => updateParams({ sort: e.target.value, page: '' })}
+            aria-label="Sort teams"
+          >
+            <option value="newest">Newest</option>
+            <option value="seats">Most seats left</option>
+          </select>
+        </div>
+
+        {meta && !error && (
+          <p className="result-count">
+            {meta.total} team{meta.total === 1 ? '' : 's'}
+          </p>
         )}
 
-        <div className="team-grid">
-          {teams.map((team) => {
-            const seatsLeft = team.capacity - team.memberCount;
-            const fillPct = Math.round((team.memberCount / team.capacity) * 100);
-            return (
-              <Link key={team.id} to={`/teams/${team.id}`} className="card team-card">
-                <div className="team-card-top">
-                  <span className="avatar-tile" style={{ background: tileColor(team.name) }}>
-                    {initials(team.name)}
-                  </span>
-                  <div>
-                    <h3>{team.name}</h3>
-                    <p className="owner-line">
-                      {team.memberCount} of {team.capacity} seats filled
-                    </p>
-                  </div>
-                </div>
-                <p className="team-desc">{team.description || 'No description.'}</p>
-                {team.skillsNeeded?.length > 0 && (
-                  <div className="chips">
-                    <span className="chip-label">Looking for:</span>
-                    {team.skillsNeeded.map((skill) => (
-                      <span key={skill} className="chip">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="team-card-foot">
-                  <div
-                    className="meter"
-                    role="img"
-                    aria-label={`${team.memberCount} of ${team.capacity} seats filled`}
-                  >
-                    <div
-                      className={`meter-fill ${seatsLeft === 0 ? 'full' : seatsLeft === 1 ? 'few' : ''}`}
-                      style={{ width: `${fillPct}%` }}
-                    />
-                  </div>
-                  <div className="seat-row">
-                    <span>
-                      {team.memberCount}/{team.capacity} members
-                    </span>
-                    {seatBadge(seatsLeft)}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+        {error ? (
+          <div className="empty-state">
+            <h3>Something went wrong</h3>
+            <p>{error}</p>
+            <Button onClick={load}>Try again</Button>
+          </div>
+        ) : teams === null ? (
+          <div className="team-grid" aria-label="Loading teams">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <TeamCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : teams.length === 0 ? (
+          <EmptyState
+            icon={<SearchX aria-hidden="true" />}
+            title="No teams match your search"
+            text="No teams match your search. Try fewer filters, or start the team you wish existed."
+            actionLabel={hasFilters ? 'Clear filters' : 'Create a team'}
+            onAction={() =>
+              hasFilters
+                ? updateParams({ q: '', status: '', page: '' })
+                : navigate(user ? '/teams/new' : '/login?returnTo=/teams/new')
+            }
+          />
+        ) : (
+          <>
+            <div className="team-grid">
+              {teams.map((team) => (
+                <TeamCard
+                  key={team.id}
+                  team={team}
+                  user={user}
+                  onJoin={quickJoin}
+                  joining={joiningId === team.id}
+                />
+              ))}
+            </div>
+            {meta && (
+              <Pagination
+                page={meta.page}
+                totalPages={meta.totalPages}
+                onPage={(p) => updateParams({ page: p === 1 ? '' : p })}
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );

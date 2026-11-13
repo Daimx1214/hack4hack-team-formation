@@ -1,0 +1,75 @@
+/* TeamForge design tokens — Build Spec §3.1/§3.3, verbatim values.
+   Every colour in the app resolves through these variables; components
+   never hard-code hex. Themes switch by [data-theme] on <html>. */
+
+:root,
+[data-theme='light'] {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f3f2ee;
+  --border: #e7e5df;
+  --border-strong: #d3d0c7;
+  --text: #15171a;
+  --text-muted: #5c6169;
+  --text-subtle: #8a8f98;
+  --brand: #e8590c;
+  --brand-text: #b8440a;
+  --brand-soft: #fff1e8;
+  --success: #0b7a52;
+  --success-soft: #e6f6ee;
+  --warning: #a16207;
+  --warning-soft: #fef6dc;
+  --danger: #c2312a;
+  --danger-soft: #fdecea;
+  --info: #1d4ed8;
+  --info-soft: #e8effd;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 16px 40px rgba(16, 24, 40, 0.14);
+}
+
+[data-theme='dark'] {
+  --bg: #0b0d10;
+  --surface: #12151a;
+  --surface-2: #1a1e25;
+  --border: #262b33;
+  --border-strong: #363c46;
+  --text: #ecedef;
+  --text-muted: #a1a7b0;
+  --text-subtle: #7a818b;
+  --brand: #ff7a33;
+  --brand-text: #ff9a5c;
+  --brand-soft: #2a1a10;
+  --success: #3dd68c;
+  --success-soft: #0f2a1e;
+  --warning: #f2c14e;
+  --warning-soft: #2b2410;
+  --danger: #ff6b63;
+  --danger-soft: #2f1514;
+  --info: #6ea0ff;
+  --info-soft: #121d36;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+:root {
+  /* Type stacks (Spec §3.2) */
+  --font-sans: 'Geist Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Radius (Spec §3.3) */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+html {
+  color-scheme: light dark;
+}
