@@ -1,0 +1,16 @@
+# Build Spec §11 (Dependencies, SHOULD): keep npm packages and GitHub
+# Actions patched automatically.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /client
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

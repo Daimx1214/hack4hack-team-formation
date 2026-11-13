@@ -19,6 +19,11 @@ const userSchema = new mongoose.Schema(
     passwordHash: {
       type: String,
       required: true,
+      // Build Spec §11: the hash is never selected by default; the one
+      // place that needs it (login) asks explicitly with
+      // .select('+passwordHash'). The toJSON transform below is the
+      // second layer — it strips the hash from anything serialized.
+      select: false,
     },
     skills: {
       type: [String],

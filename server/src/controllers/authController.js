@@ -68,7 +68,9 @@ async function login(req, res) {
 
   const { email, password } = body;
 
-  const user = await User.findOne({ email });
+  // passwordHash is select:false on the model — login is the one place
+  // that genuinely needs it, so it opts in explicitly.
+  const user = await User.findOne({ email }).select('+passwordHash');
   if (!user) {
     return fail(res, 401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
   }

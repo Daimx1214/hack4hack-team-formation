@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
  * Called once at server startup (not in tests — tests connect to an
  * in-memory MongoDB themselves, see tests/setup.js).
  */
-async function connectDB(uri = process.env.MONGO_URI) {
+async function connectDB(uri = process.env.MONGO_URI || process.env.MONGODB_URI) {
   if (!uri) {
     throw new Error('MONGO_URI is not set. Copy .env.example to .env and fill it in.');
   }
