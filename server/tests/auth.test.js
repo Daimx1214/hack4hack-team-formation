@@ -18,7 +18,7 @@ describe('POST /api/auth/register', () => {
     expect(res.status).toBe(201);
     expect(res.body.user.name).toBe('Daim');
     expect(res.body.user.id).toBeDefined();
-    expect(res.body.token).toBeDefined();
+    expect(res.body.accessToken).toBeDefined();
     expect(res.body.user.passwordHash).toBeUndefined();
   });
 
@@ -33,7 +33,8 @@ describe('POST /api/auth/register', () => {
       .send({ name: 'Second', email, password: 'password123' });
 
     expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/already registered/i);
+    expect(res.body.error.code).toBe('EMAIL_TAKEN');
+    expect(res.body.error.message).toMatch(/already registered/i);
   });
 
   it('rejects missing fields', async () => {
@@ -44,13 +45,13 @@ describe('POST /api/auth/register', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rejects a password shorter than 6 characters', async () => {
+  it('rejects a password shorter than 8 characters', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Shorty', email: uniqueEmail(), password: '123' });
+      .send({ name: 'Shorty', email: uniqueEmail(), password: '1234567' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/at least 6/i);
+    expect(res.body.error.code).toBe('VALIDATION');
   });
 });
 
@@ -66,7 +67,7 @@ describe('POST /api/auth/login', () => {
       .send({ email, password: 'password123' });
 
     expect(res.status).toBe(200);
-    expect(res.body.token).toBeDefined();
+    expect(res.body.accessToken).toBeDefined();
     expect(res.body.user.email).toBe(email);
   });
 
@@ -101,7 +102,7 @@ describe('GET /api/auth/me', () => {
 
     const res = await request(app)
       .get('/api/auth/me')
-      .set('Authorization', `Bearer ${registerRes.body.token}`);
+      .set('Authorization', `Bearer ${registerRes.body.accessToken}`);
 
     expect(res.status).toBe(200);
     expect(res.body.user.email).toBe(email);

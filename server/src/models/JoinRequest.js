@@ -1,15 +1,19 @@
 const mongoose = require('mongoose');
 
 /**
- * Idempotency record for join requests.
+ * Idempotency record for join requests (Build Spec §10.2).
  *
- * When a client sends an `Idempotency-Key` header with POST /teams/:id/join,
- * we store one row per (user, key) after a successful join. If the same
- * request is retried (double-click, network retry, refresh), we find this
- * row and return the original result instead of joining a second time.
- *
- * The unique index on (user, key) is what makes this safe under concurrency:
- * even if two retries arrive at the same moment, only one row can exist.
+ * POST /teams/:id/join REQUIRES an Idempotency-Key (a UUID). The flow:
+ *  1. The controller first tries to INSERT a record with status
+ *     'processing'. The unique index on (user, key) guarantees only one
+ *     record per key, even when retries race.
+ *  2. When the join attempt settles, the record is updated to 'done' with
+ *     the response status that was returned (201 for a fresh join, 409 for
+ *     TEAM_FULL / ALREADY_MEMBER, ...), so a later retry replays the SAME
+ *     answer instead of joining again.
+ *  3. A retry that arrives while the first attempt is still 'processing'
+ *     gets 409 REQUEST_IN_PROGRESS.
+ * Records expire after 24 hours via the TTL index on createdAt.
  */
 const joinRequestSchema = new mongoose.Schema(
   {
@@ -29,13 +33,29 @@ const joinRequestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['joined'],
-      default: 'joined',
+      enum: ['processing', 'done'],
+      default: 'processing',
+    },
+    responseStatus: {
+      type: Number,
+      default: null,
+    },
+    responseCode: {
+      type: String,
+      default: null,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+      expires: 60 * 60 * 24, // TTL: 24 hours
     },
   },
-  { timestamps: true }
+  { timestamps: false }
 );
 
-joinRequestSchema.index({ user: 1, key: 1 }, { unique: true });
+// Scoped per team as well as per user+key: the same key string used on a
+// different team is a different intent (the route differs), while a retry
+// of the SAME join always collides with its original record.
+joinRequestSchema.index({ user: 1, key: 1, team: 1 }, { unique: true });
 
 module.exports = mongoose.model('JoinRequest', joinRequestSchema);

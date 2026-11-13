@@ -38,4 +38,5 @@ scenarios:
           url: "/api/teams/{{ teamId }}/join"
           headers:
             Authorization: "Bearer {{ token }}"
+            Idempotency-Key: "{{ idemKey }}"
           json: {}

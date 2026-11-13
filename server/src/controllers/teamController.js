@@ -1,61 +1,158 @@
 const mongoose = require('mongoose');
 const Team = require('../models/Team');
 const JoinRequest = require('../models/JoinRequest');
+const { fail } = require('../utils/errors');
+const { serializeTeam } = require('../utils/serialize');
+const {
+  createTeamSchema,
+  updateTeamSchema,
+  listTeamsQuerySchema,
+  mineQuerySchema,
+  parseOr400,
+} = require('../validators/schemas');
 
 /**
- * Team endpoints.
+ * Team endpoints (API contract: Build Spec §10).
  *
- * The interesting part of this whole project is `joinTeam` below: it is the
+ * The interesting part of this project is `joinTeam` below: it is the
  * operation that must stay correct when many requests arrive at the same
  * moment. Everything else is ordinary CRUD. See DESIGN.md §3 for the full
  * explanation of the concurrency strategy.
  */
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Escape user input before putting it in a RegExp (regex-DoS / injection
+// guard for the ?q= search parameter).
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Populate the fields the serializer needs (names, not raw ids or emails).
+function populateNames(query) {
+  return query.populate('members.user', 'name').populate('owner', 'name');
+}
+
+async function findTeamSerialized(id, viewerId) {
+  const team = await populateNames(Team.findById(id));
+  return team ? serializeTeam(team, viewerId) : null;
+}
+
+function invalidId(res) {
+  return fail(res, 400, 'INVALID_ID', 'That team id is not valid');
+}
+
 // POST /api/teams — create a team. The creator becomes owner AND member #1,
 // so memberCount starts at 1.
 async function createTeam(req, res) {
-  const { name, description, capacity, skillsNeeded } = req.body || {};
-
-  if (!name) {
-    return res.status(400).json({ error: 'Team name is required' });
-  }
-  if (capacity !== undefined && (!Number.isInteger(capacity) || capacity < 2 || capacity > 10)) {
-    return res.status(400).json({ error: 'Capacity must be an integer between 2 and 10' });
-  }
+  const body = parseOr400(res, createTeamSchema, req.body ?? {});
+  if (!body) return;
 
   const team = await Team.create({
-    name,
-    description: description || '',
+    name: body.name,
+    description: body.description,
     owner: req.user._id,
-    capacity: capacity === undefined ? 4 : capacity,
+    capacity: body.capacity,
     members: [{ user: req.user._id, role: 'owner', joinedAt: new Date() }],
     memberCount: 1,
-    skillsNeeded: Array.isArray(skillsNeeded) ? skillsNeeded : [],
+    skillsNeeded: body.skillsNeeded,
   });
 
-  return res.status(201).json({ team });
+  return res.status(201).json({ team: await findTeamSerialized(team._id, req.user._id) });
 }
 
-// GET /api/teams — list all teams, newest first.
-// Read paths (list + get) POPULATE each member's user with name and email,
-// so clients can show "Alice (owner)" instead of a raw ObjectId. Write
-// responses (create/join/leave) keep the plain ids — membership semantics
-// are identical either way; only the read shape is friendlier.
+// GET /api/teams — browse with search (?q=), status filter (?status=open|
+// full), sorting (?sort=newest|seats) and pagination (?page=&limit=).
+// Response: { data: [Team], meta: { page, limit, total, totalPages } }.
 async function listTeams(req, res) {
-  const teams = await Team.find().populate('members.user', 'name email').sort({ createdAt: -1 });
-  return res.status(200).json({ teams });
+  const query = parseOr400(res, listTeamsQuerySchema, req.query ?? {});
+  if (!query) return;
+
+  const filter = {};
+  if (query.q) {
+    const pattern = new RegExp(escapeRegex(query.q), 'i');
+    filter.$or = [{ name: pattern }, { description: pattern }];
+  }
+  if (query.status === 'open') filter.$expr = { $lt: ['$memberCount', '$capacity'] };
+  if (query.status === 'full') filter.$expr = { $gte: ['$memberCount', '$capacity'] };
+
+  const total = await Team.countDocuments(filter);
+  let teams;
+  if (query.sort === 'seats') {
+    // "Most seats left" needs a computed ordering; the data set is small,
+    // so sort the filtered set in memory and then take the page.
+    const all = await populateNames(Team.find(filter).sort({ createdAt: -1 }));
+    all.sort((a, b) => b.capacity - b.memberCount - (a.capacity - a.memberCount));
+    teams = all.slice((query.page - 1) * query.limit, query.page * query.limit);
+  } else {
+    teams = await populateNames(
+      Team.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((query.page - 1) * query.limit)
+        .limit(query.limit)
+    );
+  }
+
+  const viewerId = req.user ? req.user._id : null;
+  return res.status(200).json({
+    data: teams.map((t) => serializeTeam(t, viewerId)),
+    meta: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+    },
+  });
+}
+
+// GET /api/teams/mine?role=joined|created — the caller's own teams.
+// Registered BEFORE /:id in the router so "mine" is never parsed as an id.
+async function listMyTeams(req, res) {
+  const query = parseOr400(res, mineQuerySchema, req.query ?? {});
+  if (!query) return;
+
+  const filter =
+    query.role === 'created' ? { owner: req.user._id } : { 'members.user': req.user._id };
+  const teams = await populateNames(Team.find(filter).sort({ createdAt: -1 }));
+  return res.status(200).json({ data: teams.map((t) => serializeTeam(t, req.user._id)) });
 }
 
 // GET /api/teams/:id — fetch one team.
 async function getTeam(req, res) {
-  if (!mongoose.isValidObjectId(req.params.id)) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
-  const team = await Team.findById(req.params.id).populate('members.user', 'name email');
-  if (!team) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
+  if (!mongoose.isValidObjectId(req.params.id)) return invalidId(res);
+  const team = await findTeamSerialized(req.params.id, req.user ? req.user._id : null);
+  if (!team) return fail(res, 404, 'NOT_FOUND', 'Team not found');
   return res.status(200).json({ team });
+}
+
+// PATCH /api/teams/:id — owner-only edit. Capacity may move within 2–12
+// but never below the current member count (409 CAPACITY_BELOW_MEMBERS).
+async function updateTeam(req, res) {
+  if (!mongoose.isValidObjectId(req.params.id)) return invalidId(res);
+  const body = parseOr400(res, updateTeamSchema, req.body ?? {});
+  if (!body) return;
+
+  const team = await Team.findById(req.params.id);
+  if (!team) return fail(res, 404, 'NOT_FOUND', 'Team not found');
+  if (team.owner.toString() !== req.user._id.toString()) {
+    return fail(res, 403, 'FORBIDDEN', "You don't have permission to do that");
+  }
+  if (body.capacity !== undefined && body.capacity < team.memberCount) {
+    return fail(
+      res,
+      409,
+      'CAPACITY_BELOW_MEMBERS',
+      `Capacity cannot be below the current member count (${team.memberCount})`
+    );
+  }
+
+  if (body.name !== undefined) team.name = body.name;
+  if (body.description !== undefined) team.description = body.description;
+  if (body.capacity !== undefined) team.capacity = body.capacity;
+  if (body.skillsNeeded !== undefined) team.skillsNeeded = body.skillsNeeded;
+  await team.save();
+
+  return res.status(200).json({ team: await findTeamSerialized(team._id, req.user._id) });
 }
 
 /**
@@ -73,52 +170,96 @@ async function getTeam(req, res) {
  *     { $push: { members: ... }, $inc: { memberCount: 1 } }
  *   )
  *
- * MongoDB applies an update to a single document atomically — the filter is
- * evaluated against the document as part of the same operation that writes.
- * Racing requests are serialised by the database: only the first one(s) with
- * a genuinely free seat match the filter; the rest get `null` back and we
- * answer 409. No locks, no transactions, no replica set needed.
+ * MongoDB applies an update to a single document atomically — the filter
+ * is evaluated against the document as part of the same operation that
+ * writes. Racing requests are serialised by the database: only the ones
+ * with a genuinely free seat match the filter; the rest get `null` back
+ * and we answer 409. No locks, no transactions, no replica set needed.
+ *
+ * Idempotency (Spec §10.2): the Idempotency-Key header is REQUIRED and
+ * must be a UUID. Before attempting the join we insert a 'processing'
+ * record; when the attempt settles we store its outcome on the record. A
+ * retry with the same key replays the stored outcome (with an
+ * `Idempotent-Replay: true` header) instead of joining a second time,
+ * and a retry that arrives mid-flight gets 409 REQUEST_IN_PROGRESS.
  */
 async function joinTeam(req, res) {
   const teamId = req.params.id;
   const userId = req.user._id;
 
-  if (!mongoose.isValidObjectId(teamId)) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
+  if (!mongoose.isValidObjectId(teamId)) return invalidId(res);
 
-  // Idempotency: if the client sent an Idempotency-Key and we have already
-  // recorded a successful join for it, return that original result instead
-  // of attempting the join again (safe retry / double-click protection).
   const idempotencyKey = req.headers['idempotency-key'];
-  if (idempotencyKey) {
-    const prior = await JoinRequest.findOne({ user: userId, key: idempotencyKey });
-    if (prior) {
-      const team = await Team.findById(prior.team);
-      return res.status(200).json({ team, idempotentReplay: true });
-    }
+  if (!idempotencyKey || !UUID_RE.test(idempotencyKey)) {
+    return fail(
+      res,
+      400,
+      'MISSING_IDEMPOTENCY_KEY',
+      'An Idempotency-Key header (UUID) is required to join a team'
+    );
   }
 
-  // We need the team's capacity for the atomic filter below. Reading it here
-  // is safe because capacity is IMMUTABLE after creation (DESIGN.md §3.3) —
-  // the value we read is always the value that gets enforced.
+  // Step 1: claim the key. Only one record per (user, key, team) can exist.
+  let record;
+  try {
+    record = await JoinRequest.create({ user: userId, team: teamId, key: idempotencyKey });
+  } catch (err) {
+    if (err.code !== 11000) throw err;
+    const prior = await JoinRequest.findOne({ user: userId, key: idempotencyKey, team: teamId });
+    if (!prior) throw err; // index raced in an unexpected way — surface it
+    if (prior.status === 'processing') {
+      return fail(
+        res,
+        409,
+        'REQUEST_IN_PROGRESS',
+        'That join is still being processed — retry in a moment with the same key'
+      );
+    }
+    // Replay the stored outcome of the original attempt.
+    res.set('Idempotent-Replay', 'true');
+    if (prior.responseStatus === 201) {
+      const team = await findTeamSerialized(teamId, userId);
+      if (team) return res.status(200).json({ team });
+      return fail(res, 404, 'NOT_FOUND', 'Team not found');
+    }
+    if (prior.responseCode === 'ALREADY_MEMBER') {
+      return fail(res, 409, 'ALREADY_MEMBER', "You're already in this team");
+    }
+    if (prior.responseCode === 'TEAM_FULL') {
+      return fail(res, 409, 'TEAM_FULL', 'This team is full');
+    }
+    return fail(res, prior.responseStatus || 409, prior.responseCode || 'CONFLICT', 'That join could not be completed');
+  }
+
+  // Settle the record with the attempt's outcome before responding.
+  async function settle(responseStatus, responseCode) {
+    record.status = 'done';
+    record.responseStatus = responseStatus;
+    record.responseCode = responseCode;
+    await record.save();
+  }
+
+  // Step 2: the team must exist (capacity is read fresh — it is enforced
+  // inside the atomic write below, so an owner edit between this read and
+  // the write can never cause an over-fill).
   const existing = await Team.findById(teamId).select('capacity');
   if (!existing) {
-    return res.status(404).json({ error: 'Team not found' });
+    await record.deleteOne(); // not an outcome worth replaying
+    return fail(res, 404, 'NOT_FOUND', 'Team not found');
   }
 
-  // === The atomic join. Conditions and mutation happen together, or not at all. ===
+  // Step 3: === The atomic join. Conditions and mutation happen together. ===
   const team = await Team.findOneAndUpdate(
     {
       _id: teamId,
       memberCount: { $lt: existing.capacity }, // a seat must still be free
-      'members.user': { $ne: userId },         // and the user must not already be in
+      'members.user': { $ne: userId }, // and the user must not already be in
     },
     {
       $push: { members: { user: userId, role: 'member', joinedAt: new Date() } },
       $inc: { memberCount: 1 }, // counter moves in the SAME atomic write
     },
-    { new: true } // return the document after the update
+    { new: true }
   );
 
   if (!team) {
@@ -126,53 +267,38 @@ async function joinTeam(req, res) {
     // is already guaranteed — this re-read only tells the caller WHY.
     const current = await Team.findById(teamId);
     if (!current) {
-      // The team was deleted between the capacity read above and this
-      // re-read. That is a plain "not found" — without this guard the
-      // next line would dereference null and turn it into a 500.
-      return res.status(404).json({ error: 'Team not found' });
+      // The team was deleted between the read above and this re-read.
+      await record.deleteOne();
+      return fail(res, 404, 'NOT_FOUND', 'Team not found');
     }
-    const alreadyMember = current.members.some(
-      (m) => m.user.toString() === userId.toString()
-    );
+    const alreadyMember = current.members.some((m) => m.user.toString() === userId.toString());
     if (alreadyMember) {
-      return res.status(409).json({ error: 'You are already a member of this team' });
+      await settle(409, 'ALREADY_MEMBER');
+      return fail(res, 409, 'ALREADY_MEMBER', "You're already in this team");
     }
-    return res.status(409).json({ error: 'Team is full' });
+    await settle(409, 'TEAM_FULL');
+    return fail(res, 409, 'TEAM_FULL', 'This team is full');
   }
 
-  // Record the idempotency key (if any) so a retry returns this result.
-  // The unique index on (user, key) means even concurrent retries can only
-  // ever create one record — a duplicate-key error here is harmless.
-  if (idempotencyKey) {
-    try {
-      await JoinRequest.create({ user: userId, team: teamId, key: idempotencyKey });
-    } catch (err) {
-      if (err.code !== 11000) throw err; // 11000 = duplicate key, expected on races
-    }
-  }
-
-  return res.status(200).json({ team });
+  await settle(201, null);
+  return res.status(201).json({ team: await findTeamSerialized(teamId, userId) });
 }
 
-// POST /api/teams/:id/leave — remove the caller from a team.
-// Symmetric to join: the "is a member" condition and the removal + counter
-// decrement happen in one atomic update, so a double-submitted leave can
-// only decrement the counter once.
+// DELETE /api/teams/:id/leave — remove the caller from a team.
+// Symmetric to join: the "is a member" condition and the removal +
+// counter decrement happen in one atomic update, so a double-submitted
+// leave can only decrement the counter once.
 async function leaveTeam(req, res) {
   const teamId = req.params.id;
   const userId = req.user._id;
 
-  if (!mongoose.isValidObjectId(teamId)) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
+  if (!mongoose.isValidObjectId(teamId)) return invalidId(res);
 
   const existing = await Team.findById(teamId).select('owner');
-  if (!existing) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
+  if (!existing) return fail(res, 404, 'NOT_FOUND', 'Team not found');
   // Product rule: the owner cannot abandon their own team — they delete it.
   if (existing.owner.toString() === userId.toString()) {
-    return res.status(400).json({ error: 'The team owner cannot leave; delete the team instead' });
+    return fail(res, 403, 'OWNER_CANNOT_LEAVE', 'The team owner cannot leave; delete the team instead');
   }
 
   const team = await Team.findOneAndUpdate(
@@ -185,25 +311,51 @@ async function leaveTeam(req, res) {
   );
 
   if (!team) {
-    return res.status(409).json({ error: 'You are not a member of this team' });
+    return fail(res, 409, 'NOT_A_MEMBER', "You're not in this team");
   }
-  return res.status(200).json({ team });
+  return res.status(200).json({ team: await findTeamSerialized(teamId, userId) });
 }
 
-// DELETE /api/teams/:id — only the owner may delete a team.
+// DELETE /api/teams/:id — only the owner may delete a team. 204 on success.
 async function deleteTeam(req, res) {
-  if (!mongoose.isValidObjectId(req.params.id)) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
+  if (!mongoose.isValidObjectId(req.params.id)) return invalidId(res);
   const team = await Team.findById(req.params.id);
-  if (!team) {
-    return res.status(404).json({ error: 'Team not found' });
-  }
+  if (!team) return fail(res, 404, 'NOT_FOUND', 'Team not found');
   if (team.owner.toString() !== req.user._id.toString()) {
-    return res.status(403).json({ error: 'Only the team owner can delete this team' });
+    return fail(res, 403, 'FORBIDDEN', "You don't have permission to do that");
   }
   await team.deleteOne();
-  return res.status(200).json({ message: 'Team deleted' });
+  return res.status(204).send();
 }
 
-module.exports = { createTeam, listTeams, getTeam, joinTeam, leaveTeam, deleteTeam };
+// GET /api/stats — real totals for the landing page stats strip.
+// Never faked: these are computed from the teams collection on request.
+async function getStats(req, res) {
+  const [row] = await Team.aggregate([
+    {
+      $group: {
+        _id: null,
+        teams: { $sum: 1 },
+        members: { $sum: '$memberCount' },
+        openSeats: { $sum: { $subtract: ['$capacity', '$memberCount'] } },
+      },
+    },
+  ]);
+  return res.status(200).json({
+    teams: row ? row.teams : 0,
+    members: row ? row.members : 0,
+    openSeats: row ? row.openSeats : 0,
+  });
+}
+
+module.exports = {
+  createTeam,
+  listTeams,
+  listMyTeams,
+  getTeam,
+  updateTeam,
+  joinTeam,
+  leaveTeam,
+  deleteTeam,
+  getStats,
+};

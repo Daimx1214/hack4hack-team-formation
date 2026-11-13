@@ -36,8 +36,8 @@ export default function Teams({ user }) {
 
   useEffect(() => {
     teamsApi
-      .list()
-      .then((data) => setTeams(data.teams))
+      .list({ limit: 50 })
+      .then((data) => setTeams(data.data))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);

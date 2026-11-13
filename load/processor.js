@@ -22,6 +22,9 @@ function pickUser(context, events, done) {
   const { teamId, tokens } = loadContext();
   context.vars.teamId = teamId;
   context.vars.token = tokens[Math.floor(Math.random() * tokens.length)];
+  // The join endpoint requires an Idempotency-Key (UUID) per join intent;
+  // each virtual user is one intent, so it gets one fresh key here.
+  context.vars.idemKey = require('crypto').randomUUID();
   return done();
 }
 

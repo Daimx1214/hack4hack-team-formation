@@ -20,7 +20,7 @@ async function registerUser(app, overrides = {}) {
   if (res.status !== 201) {
     throw new Error(`registerUser failed: ${res.status} ${JSON.stringify(res.body)}`);
   }
-  return { user: res.body.user, token: res.body.token };
+  return { user: res.body.user, token: res.body.accessToken };
 }
 
 // Create a team through the real API as the given user.

@@ -64,7 +64,7 @@ export default function App() {
   }, []);
 
   function handleAuth(data) {
-    setToken(data.token);
+    setToken(data.accessToken);
     setUser(data.user);
     navigate('/');
   }

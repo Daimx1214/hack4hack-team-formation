@@ -40,15 +40,17 @@ const teamSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
-    // Capacity is IMMUTABLE after creation (enforced in the controllers by
-    // simply never offering an update path). The join operation reads this
-    // value and uses it in its atomic filter — if it could change mid-flight,
-    // a stale value could be enforced. See DESIGN.md §3.3.
+    // Capacity can be edited by the owner (PATCH /teams/:id) but never
+    // below the current member count — that floor is enforced in the
+    // controller with a 409. Editing is race-safe: the join operation
+    // re-reads capacity on every request and enforces it inside the same
+    // atomic write, so a mid-flight edit can never cause an over-fill
+    // (lowering capacity can only make the filter stricter). See DESIGN.md §3.3.
     capacity: {
       type: Number,
       required: true,
       min: [2, 'Capacity must be at least 2'],
-      max: [10, 'Capacity must be at most 10'],
+      max: [12, 'Capacity must be at most 12'],
       default: 4,
     },
     members: {

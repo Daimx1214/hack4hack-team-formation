@@ -26,8 +26,14 @@ async function api(path, { method = 'GET', body, headers = {} } = {}) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.error || `Request failed (${res.status})`);
+    // API error contract: { error: { code, message } }. Fall back to a
+    // plain string error or the status line for anything non-standard.
+    const serverError = data.error;
+    const message =
+      (serverError && serverError.message) || serverError || `Request failed (${res.status})`;
+    const err = new Error(message);
     err.status = res.status;
+    err.code = serverError && serverError.code;
     throw err;
   }
   return data;
@@ -40,7 +46,12 @@ export const authApi = {
 };
 
 export const teamsApi = {
-  list: () => api('/api/teams'),
+  list: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
+    ).toString();
+    return api(`/api/teams${qs ? `?${qs}` : ''}`);
+  },
   get: (id) => api(`/api/teams/${id}`),
   create: (payload) => api('/api/teams', { method: 'POST', body: payload }),
   // One idempotency key per join *intent* for a given team (see joinKeyFor
@@ -64,7 +75,7 @@ export const teamsApi = {
       throw err;
     }
   },
-  leave: (id) => api(`/api/teams/${id}/leave`, { method: 'POST', body: {} }),
+  leave: (id) => api(`/api/teams/${id}/leave`, { method: 'DELETE' }),
   remove: (id) => api(`/api/teams/${id}`, { method: 'DELETE' }),
 };
 
@@ -76,7 +87,8 @@ function joinKeyFor(teamId) {
   const storageKey = `join-key-${teamId}`;
   let key = sessionStorage.getItem(storageKey);
   if (!key) {
-    key = `join-${teamId}-${crypto.randomUUID()}`;
+    // The API requires the key to be a bare UUID (Spec §10.2).
+    key = crypto.randomUUID();
     sessionStorage.setItem(storageKey, key);
   }
   return key;

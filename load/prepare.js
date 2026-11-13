@@ -39,13 +39,13 @@ async function getToken(i) {
     method: 'POST',
     body: { name: `Load User ${i}`, email, password: PASSWORD },
   });
-  if (registered.status === 201) return registered.data.token;
+  if (registered.status === 201) return registered.data.accessToken;
 
   const loggedIn = await api('/api/auth/login', {
     method: 'POST',
     body: { email, password: PASSWORD },
   });
-  if (loggedIn.status === 200) return loggedIn.data.token;
+  if (loggedIn.status === 200) return loggedIn.data.accessToken;
 
   throw new Error(`Could not get a token for ${email} (register ${registered.status}, login ${loggedIn.status})`);
 }
