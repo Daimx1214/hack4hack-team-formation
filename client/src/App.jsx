@@ -11,6 +11,8 @@ import Register from './pages/Register';
 import Teams from './pages/Teams';
 import TeamDetail from './pages/TeamDetail';
 import CreateTeam from './pages/CreateTeam';
+import EditTeam from './pages/EditTeam';
+import ProtectedRoute from './components/layout/ProtectedRoute';
 
 // Reset the scroll position on every navigation. Hash links (e.g.
 // /#how-it-works) scroll to their anchor instead.
@@ -33,6 +35,9 @@ function ScrollManager() {
 // `user` / `onAuth` down to pages. Simple prop drilling is fine at this size.
 function AppShell() {
   const [user, setUser] = useState(null);
+  // Protected routes wait for the restore attempt to settle before
+  // deciding a visitor is a guest (no hint → settled immediately).
+  const [sessionReady, setSessionReady] = useState(() => !hasSessionHint());
   const navigate = useNavigate();
 
   // On first load, silently restore the session: the refresh cookie is
@@ -44,7 +49,8 @@ function AppShell() {
       .refresh()
       .then(() => authApi.me())
       .then((data) => setUser(data.user))
-      .catch(() => setToken(null));
+      .catch(() => setToken(null))
+      .finally(() => setSessionReady(true));
   }, []);
 
   function handleAuth(data, returnTo) {
@@ -75,8 +81,23 @@ function AppShell() {
           <Route path="/teams" element={<Teams user={user} />} />
           <Route path="/login" element={<Login user={user} onAuth={handleAuth} />} />
           <Route path="/register" element={<Register user={user} onAuth={handleAuth} />} />
+          <Route
+            path="/teams/new"
+            element={
+              <ProtectedRoute user={user} sessionReady={sessionReady}>
+                <CreateTeam user={user} />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/teams/:id" element={<TeamDetail user={user} />} />
-          <Route path="/create" element={<CreateTeam user={user} />} />
+          <Route
+            path="/teams/:id/edit"
+            element={
+              <ProtectedRoute user={user} sessionReady={sessionReady}>
+                <EditTeam user={user} />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
       <Footer />

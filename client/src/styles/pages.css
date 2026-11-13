@@ -638,3 +638,42 @@
   border: 1px solid var(--border);
   cursor: default;
 }
+
+/* ---------- Create / edit team (§5.5) ---------- */
+.form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+  max-width: 1024px;
+  margin: 0 auto;
+}
+@media (max-width: 1023px) {
+  .form-layout {
+    grid-template-columns: minmax(0, 560px);
+    justify-content: center;
+  }
+  .form-preview {
+    display: none;
+  }
+}
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+}
+.form-preview {
+  position: sticky;
+  top: 88px;
+  pointer-events: none;
+}
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.char-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
