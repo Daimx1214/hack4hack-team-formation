@@ -239,20 +239,22 @@ async function joinTeam(req, res) {
     await record.save();
   }
 
-  // Step 2: the team must exist (capacity is read fresh — it is enforced
-  // inside the atomic write below, so an owner edit between this read and
-  // the write can never cause an over-fill).
-  const existing = await Team.findById(teamId).select('capacity');
+  // Step 2: the team must exist.
+  const existing = await Team.findById(teamId).select('_id');
   if (!existing) {
     await record.deleteOne(); // not an outcome worth replaying
     return fail(res, 404, 'NOT_FOUND', 'Team not found');
   }
 
   // Step 3: === The atomic join. Conditions and mutation happen together. ===
+  // The seat check compares memberCount against the team's OWN capacity
+  // field inside the atomic operation ($expr), never against a value read
+  // earlier in JS — so even if the owner edits capacity a millisecond
+  // before this write, the limit enforced is the document's current one.
   const team = await Team.findOneAndUpdate(
     {
       _id: teamId,
-      memberCount: { $lt: existing.capacity }, // a seat must still be free
+      $expr: { $lt: ['$memberCount', '$capacity'] }, // a seat must still be free
       'members.user': { $ne: userId }, // and the user must not already be in
     },
     {
