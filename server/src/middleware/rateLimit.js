@@ -4,10 +4,10 @@ const { fail } = require('../utils/errors');
 /**
  * Rate limits (Build Spec §11). Three layers:
  *  - global: every request, per IP (300 / 15 min)
- *  - auth: login + register, per IP (10 / 15 min) — counts FAILED
- *    attempts only (skipSuccessfulRequests), because brute-force
- *    protection is about failures, and legitimate demo/test traffic
- *    should not lock itself out by succeeding.
+ *  - auth: login + register, per IP (10 requests / 15 min) — counts
+ *    every request, exactly as §11 states. Per-account brute-force
+ *    lockout (5 failed logins → 15 min, generic error throughout)
+ *    lives in the auth controller and complements this blunt IP cap.
  *  - write: team create + join, per authenticated user (60 / min)
  *
  * Caps are env-overridable (RATE_LIMIT_GLOBAL_MAX etc.) so deployments
@@ -34,7 +34,6 @@ function makeLimiters() {
     max: Number(process.env.RATE_LIMIT_AUTH_MAX || 10),
     standardHeaders: true,
     legacyHeaders: false,
-    skipSuccessfulRequests: true,
     handler: tooMany,
   });
 

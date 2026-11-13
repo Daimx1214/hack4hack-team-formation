@@ -24,15 +24,6 @@ export default function TeamCard({ team, user, onJoin, joining = false }) {
       ) : (
         <p className="team-card-desc muted">No description yet.</p>
       )}
-      {team.skillsNeeded && team.skillsNeeded.length > 0 && (
-        <div className="skill-chips">
-          {team.skillsNeeded.slice(0, 4).map((skill) => (
-            <span key={skill} className="skill-chip">
-              {skill}
-            </span>
-          ))}
-        </div>
-      )}
       <SeatMeter team={team} />
       <div className="team-card-footer">
         <AvatarStack members={team.members} />

@@ -744,3 +744,19 @@
   color: var(--brand-text);
   margin-bottom: 16px;
 }
+
+/* Join-by-invite-code row on the browse page */
+.code-join {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.code-join .code-input {
+  width: 160px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

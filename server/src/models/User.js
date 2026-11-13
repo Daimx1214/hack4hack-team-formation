@@ -25,9 +25,18 @@ const userSchema = new mongoose.Schema(
       // second layer — it strips the hash from anything serialized.
       select: false,
     },
-    skills: {
-      type: [String],
-      default: [],
+    // Brute-force lockout (Build Spec §11): consecutive failed logins are
+    // counted per account; at the threshold the account locks for a
+    // while. Neither field is ever selected or serialized by default.
+    failedLoginCount: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    lockedUntil: {
+      type: Date,
+      default: null,
+      select: false,
     },
   },
   { timestamps: true }
@@ -53,6 +62,8 @@ userSchema.set('toJSON', {
     delete ret._id;
     delete ret.__v;
     delete ret.passwordHash;
+    delete ret.failedLoginCount;
+    delete ret.lockedUntil;
     return ret;
   },
 });

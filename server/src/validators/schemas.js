@@ -16,7 +16,6 @@ const registerSchema = z
       .string()
       .min(8, 'Password must be at least 8 characters')
       .max(72, 'Password must be at most 72 characters'),
-    skills: z.array(z.string().trim().min(1).max(40)).max(20).optional().default([]),
   })
   .strict();
 
@@ -27,18 +26,12 @@ const loginSchema = z
   })
   .strict();
 
-const skillsNeededField = z
-  .array(z.string().trim().min(1).max(40))
-  .max(10)
-  .optional()
-  .default([]);
-
 const createTeamSchema = z
   .object({
     name: z.string().trim().min(3, 'Team name must be at least 3 characters').max(50),
     description: z.string().trim().max(280).optional().default(''),
     capacity: z.number().int().min(2).max(12),
-    skillsNeeded: skillsNeededField,
+    requireApproval: z.boolean().optional().default(false),
   })
   .strict();
 
@@ -50,7 +43,7 @@ const updateTeamSchema = z
     name: z.string().trim().min(3, 'Team name must be at least 3 characters').max(50).optional(),
     description: z.string().trim().max(280).optional(),
     capacity: z.number().int().min(2).max(12).optional(),
-    skillsNeeded: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+    requireApproval: z.boolean().optional(),
   })
   .strict()
   .refine((data) => Object.keys(data).length > 0, {
@@ -70,6 +63,20 @@ const listTeamsQuerySchema = z
 const mineQuerySchema = z
   .object({
     role: z.enum(['joined', 'created']).default('joined'),
+  })
+  .strict();
+
+const joinByCodeSchema = z
+  .object({
+    code: z.string().trim().toUpperCase().min(4).max(32),
+  })
+  .strict();
+
+// Settings page (Spec §5.7): the only profile field a user may change
+// is their display name.
+const updateProfileSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(60),
   })
   .strict();
 
@@ -97,5 +104,7 @@ module.exports = {
   updateTeamSchema,
   listTeamsQuerySchema,
   mineQuerySchema,
+  updateProfileSchema,
+  joinByCodeSchema,
   parseOr400,
 };

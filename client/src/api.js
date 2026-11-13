@@ -124,8 +124,10 @@ export const authApi = {
   register: (payload) => api('/api/auth/register', { method: 'POST', body: payload }),
   login: (payload) => api('/api/auth/login', { method: 'POST', body: payload }),
   me: () => api('/api/auth/me'),
+  updateMe: (payload) => api('/api/auth/me', { method: 'PATCH', body: payload }),
   refresh: () => refreshSession(),
   logout: () => rawFetch('/api/auth/logout', { method: 'POST' }),
+  logoutAll: () => api('/api/auth/logout-all', { method: 'POST' }),
 };
 
 export const teamsApi = {
@@ -147,19 +149,43 @@ export const teamsApi = {
       const data = await api(`/api/teams/${id}/join`, {
         method: 'POST',
         body: {},
-        headers: { 'Idempotency-Key': joinKeyFor(id) },
+        headers: { 'Idempotency-Key': joinKeyFor(`join-key-${id}`) },
       });
-      clearJoinKey(id); // server answered with success — this intent is done
+      clearJoinKey(`join-key-${id}`); // server answered — this intent is done
       return data;
     } catch (err) {
       // If the server ANSWERED (err.status is set — even a 409 verdict),
       // the intent is settled, so drop the key. If there was no response
       // at all (network failure — the join may or may not have happened),
       // KEEP the key so the retry is recognised as a replay, not a new join.
-      if (err.status) clearJoinKey(id);
+      if (err.status) clearJoinKey(`join-key-${id}`);
       throw err;
     }
   },
+  // Joining by invite code runs the same server pipeline as joining by
+  // id (approval teams answer 202 with an application, like join does).
+  joinByCode: async (code) => {
+    const normalized = code.trim().toUpperCase();
+    const storageKey = `join-key-code-${normalized}`;
+    try {
+      const data = await api('/api/teams/join-by-code', {
+        method: 'POST',
+        body: { code: normalized },
+        headers: { 'Idempotency-Key': joinKeyFor(storageKey) },
+      });
+      clearJoinKey(storageKey);
+      return data;
+    } catch (err) {
+      if (err.status) clearJoinKey(storageKey);
+      throw err;
+    }
+  },
+  applications: (id) => api(`/api/teams/${id}/applications`),
+  approve: (id, applicationId) =>
+    api(`/api/teams/${id}/applications/${applicationId}/approve`, { method: 'POST' }),
+  reject: (id, applicationId) =>
+    api(`/api/teams/${id}/applications/${applicationId}/reject`, { method: 'POST' }),
+  regenerateCode: (id) => api(`/api/teams/${id}/invite-code`, { method: 'POST' }),
   leave: (id) => api(`/api/teams/${id}/leave`, { method: 'DELETE' }),
   remove: (id) => api(`/api/teams/${id}`, { method: 'DELETE' }),
 };
@@ -168,12 +194,12 @@ export const statsApi = {
   get: () => api('/api/stats'),
 };
 
-// The join key for a team lives in sessionStorage: it survives retries and
-// even a page reload mid-flow, but disappears when the tab closes. (The
-// server scopes keys per user, so a key string is only ever a replay for
-// the account that first used it.)
-function joinKeyFor(teamId) {
-  const storageKey = `join-key-${teamId}`;
+// The join key for an intent lives in sessionStorage under a caller-
+// chosen storage key: it survives retries and even a page reload
+// mid-flow, but disappears when the tab closes. (The server scopes keys
+// per user, so a key string is only ever a replay for the account that
+// first used it.)
+function joinKeyFor(storageKey) {
   let key = sessionStorage.getItem(storageKey);
   if (!key) {
     // The API requires the key to be a bare UUID (Spec §10.2).
@@ -183,6 +209,6 @@ function joinKeyFor(teamId) {
   return key;
 }
 
-function clearJoinKey(teamId) {
-  sessionStorage.removeItem(`join-key-${teamId}`);
+function clearJoinKey(storageKey) {
+  sessionStorage.removeItem(storageKey);
 }

@@ -25,7 +25,7 @@ export default function TeamForm({
   const [name, setName] = useState(initial.name || '');
   const [description, setDescription] = useState(initial.description || '');
   const [capacity, setCapacity] = useState(initial.capacity || 4);
-  const [skills, setSkills] = useState((initial.skillsNeeded || []).join(', '));
+  const [requireApproval, setRequireApproval] = useState(Boolean(initial.requireApproval));
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -54,11 +54,7 @@ export default function TeamForm({
         name: name.trim(),
         description: description.trim(),
         capacity,
-        skillsNeeded: skills
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .slice(0, 6),
+        requireApproval,
       });
     } catch (err) {
       if (err.code === 'CAPACITY_BELOW_MEMBERS') {
@@ -97,11 +93,6 @@ export default function TeamForm({
     isOwner: true,
     owner: { id: user?.id || 'you', name: user?.name || 'You' },
     members: previewMembers,
-    skillsNeeded: skills
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 6),
   };
 
   return (
@@ -144,14 +135,6 @@ export default function TeamForm({
             onChange={(e) => setDescription(e.target.value)}
           />
         </Field>
-        <Field id="team-skills" label="Skills you're looking for" optional>
-          <TextInput
-            id="team-skills"
-            placeholder="React, Node.js, Figma"
-            value={skills}
-            onChange={(e) => setSkills(e.target.value)}
-          />
-        </Field>
         <div className="field">
           <span className="field-label" id="capacity-label">
             Capacity
@@ -165,6 +148,22 @@ export default function TeamForm({
           ) : capacityHelper ? (
             <p className="field-hint">{capacityHelper}</p>
           ) : null}
+        </div>
+        <div className="field">
+          <label className="checkbox-row" htmlFor="team-approval">
+            <input
+              id="team-approval"
+              type="checkbox"
+              checked={requireApproval}
+              onChange={(e) => setRequireApproval(e.target.checked)}
+            />
+            <span>
+              Require my approval before anyone joins
+              <span className="field-hint" style={{ display: 'block' }}>
+                Join requests wait for your review instead of taking a seat instantly.
+              </span>
+            </span>
+          </label>
         </div>
         <div className="form-actions">
           <Button type="submit" loading={submitting}>

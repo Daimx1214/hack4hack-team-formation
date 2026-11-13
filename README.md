@@ -43,6 +43,29 @@ the team ends up over capacity. That is a classic **race condition**
 This project fixes it by making the check and the write **one atomic database
 operation** (see `DESIGN.md` for the full explanation).
 
+## Features
+
+- **Race-proof joins** — capacity is enforced inside the atomic write
+  itself (`$expr` against the document's own capacity), so concurrent
+  joins, leaves and owner capacity edits can never over-fill a team.
+- **Idempotent requests** — every join carries an `Idempotency-Key`;
+  retries and double-clicks replay the original outcome instead of
+  joining twice, even mid-flight.
+- **Sessions done properly** — 15-minute access JWTs plus rotating,
+  revocable refresh tokens (httpOnly cookie, SHA-256 hashed at rest).
+- **Brute-force protection** — per-IP rate limits (spec-literal: every
+  auth request counts) and a per-account lockout: 5 failed logins lock
+  the account for 15 minutes, always behind the same generic error.
+- **Join approvals & invite codes** — owners can require approval
+  before a seat is taken, and every team has a private invite code
+  (owner-visible only) that joins through the same pipeline.
+- **Settings** — display name, theme preference (light / dark / system,
+  no flash on load), and "sign out everywhere".
+- **Audit log** — create / join / leave / delete are recorded with
+  actor and timestamp.
+- **One-team-per-user** rule available behind an environment flag
+  (`ONE_TEAM_PER_USER`), off by default.
+
 ## Tech stack
 
 | Layer    | Choice                              |
@@ -103,14 +126,20 @@ cd server
 npm test
 ```
 
-**83 API tests, all passing** — happy paths, edge cases (duplicate email
+**94 API tests, all passing** — happy paths, edge cases (duplicate email
 `409`, forged/missing tokens `401`, deleted-team `404`s, capacity
 boundaries), the contract suite (search/filter/pagination, owner edits,
-stats), the security suite (helmet, CORS allowlist, rate limits) and the
-session suite (refresh rotation, logout revocation) — plus the
+stats), the security suite (helmet, CORS allowlist, rate limits), the
+session suite (refresh rotation, logout revocation), settings
+(name change, sign-out-everywhere), the lockout suite (5 failed logins
+lock the account), join approvals and invite codes — plus the
 concurrency suite that proves the race-proofing: join/leave stampedes
 (20 racers for 1 seat; 50 racers for 4 seats), duplicate-registration
-races, and idempotency-key retry storms.
+races, and idempotency-key retry storms. The client adds **11 component
+tests** (Vitest + Testing Library) for the seat meter and the join
+button's state machine (`cd client && npm test`).
+
+![Race-test output: 20 racers, 1 free seat, exactly 1 succeeds](docs/screenshots/race-test.png)
 
 The tests do **not** need a running MongoDB — they use
 `mongodb-memory-server`, which starts a throwaway in-memory MongoDB,

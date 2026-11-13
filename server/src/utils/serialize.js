@@ -4,7 +4,7 @@
  *
  *   { id, name, description, capacity, memberCount, seatsLeft, isFull,
  *     isMember, isOwner, owner: { id, name }, members: [{ id, name, role,
- *     joinedAt }], skillsNeeded, createdAt }
+ *     joinedAt }], createdAt }
  *
  * memberCount / seatsLeft / isFull are computed here, never stored as
  * separate truths (memberCount itself is the denormalised counter kept in
@@ -52,7 +52,12 @@ function serializeTeam(team, viewerId) {
     isOwner: viewer ? ownerId === viewer : false,
     owner: { id: ownerId, name: userNameOf(team.owner, ownerId) },
     members,
-    skillsNeeded: team.skillsNeeded || [],
+    requireApproval: Boolean(team.requireApproval),
+    // The invite code is a secret of the team: only its owner ever sees
+    // it. Everyone else just learns THAT the team can be joined by code.
+    ...(viewer && ownerId === viewer && team.inviteCode
+      ? { inviteCode: team.inviteCode }
+      : {}),
     createdAt: team.createdAt,
   };
 }

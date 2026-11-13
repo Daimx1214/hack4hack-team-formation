@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const User = require('./models/User');
 const Team = require('./models/Team');
+const { generateInviteCode } = require('./utils/codes');
 const JoinRequest = require('./models/JoinRequest');
 
 /**
@@ -23,12 +24,12 @@ const JoinRequest = require('./models/JoinRequest');
 const DEMO_PASSWORD = 'demo1234';
 
 const DEMO_USERS = [
-  { name: 'Ayesha Khan', email: 'ayesha@example.com', skills: ['React', 'Node.js'] },
-  { name: 'Bilal Ahmed', email: 'bilal@example.com', skills: ['MongoDB', 'Express'] },
-  { name: 'Chen Wei', email: 'chen@example.com', skills: ['TypeScript', 'React'] },
-  { name: 'Dana Petrova', email: 'dana@example.com', skills: ['CSS', 'React'] },
-  { name: 'Elias Rodriguez', email: 'elias@example.com', skills: ['Python', 'APIs'] },
-  { name: 'Fatima Noor', email: 'fatima@example.com', skills: ['Machine Learning', 'Python'] },
+  { name: 'Ayesha Khan', email: 'ayesha@example.com' },
+  { name: 'Bilal Ahmed', email: 'bilal@example.com' },
+  { name: 'Chen Wei', email: 'chen@example.com' },
+  { name: 'Dana Petrova', email: 'dana@example.com' },
+  { name: 'Elias Rodriguez', email: 'elias@example.com' },
+  { name: 'Fatima Noor', email: 'fatima@example.com' },
 ];
 
 // Team blueprints. `members` lists emails in join order; the FIRST email
@@ -40,28 +41,24 @@ const DEMO_TEAMS = [
     name: 'API Wizards',
     description: 'Building a race-proof hackathon API with Node and MongoDB.',
     capacity: 4,
-    skillsNeeded: ['React', 'MongoDB'],
     members: ['ayesha@example.com', 'bilal@example.com', 'chen@example.com'], // 3/4
   },
   {
     name: 'Frontend Foxes',
     description: 'Pixel-perfect UI crew. This team is full — try another one.',
     capacity: 3,
-    skillsNeeded: [],
     members: ['dana@example.com', 'elias@example.com', 'fatima@example.com'], // 3/3 FULL
   },
   {
     name: 'ML Mavericks',
     description: 'Fresh team looking for builders of every kind.',
     capacity: 5,
-    skillsNeeded: ['Python', 'React', 'Node.js'],
     members: ['fatima@example.com'], // 1/5
   },
   {
     name: 'Open Source Owls',
     description: 'Night-owl contributors welcome, any stack.',
     capacity: 6,
-    skillsNeeded: ['Git', 'JavaScript'],
     members: ['bilal@example.com', 'ayesha@example.com'], // 2/6
   },
 ];
@@ -102,7 +99,7 @@ async function seed() {
       description: blueprint.description,
       owner: usersByEmail[ownerEmail]._id,
       capacity: blueprint.capacity,
-      skillsNeeded: blueprint.skillsNeeded,
+      inviteCode: generateInviteCode(),
       members,
       memberCount: members.length, // counter matches the list by construction
     });

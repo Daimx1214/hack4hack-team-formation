@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, LogOut, Menu, Settings as SettingsIcon, X } from 'lucide-react';
 import Logo from '../ui/Logo';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
@@ -98,6 +98,17 @@ export default function Navbar({ user, onLogout }) {
                     role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
+                      navigate('/settings');
+                    }}
+                  >
+                    <SettingsIcon /> Settings
+                  </button>
+                  <button
+                    type="button"
+                    className="menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
                       onLogout();
                     }}
                   >
@@ -145,6 +156,9 @@ export default function Navbar({ user, onLogout }) {
             <>
               <Link to="/dashboard" className="nav-link" onClick={closeSheet}>
                 My teams
+              </Link>
+              <Link to="/settings" className="nav-link" onClick={closeSheet}>
+                Settings
               </Link>
               <Button
                 variant="secondary"

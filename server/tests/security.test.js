@@ -25,32 +25,26 @@ describe('Security headers (helmet)', () => {
 });
 
 describe('Auth rate limiting', () => {
-  it('returns 429 RATE_LIMITED after the failed-attempt cap (successful attempts do not count)', async () => {
+  it('returns 429 RATE_LIMITED once the per-IP request cap is used up (Spec §11: every auth request counts)', async () => {
     const email = uniqueEmail();
+    // The register itself is auth request #1 against this file's cap of 3.
     await registerUser(app, { email, password: 'password123' });
 
-    // Successful logins are not counted (skipSuccessfulRequests).
-    for (let i = 0; i < 3; i += 1) {
-      // eslint-disable-next-line no-await-in-loop
-      const ok = await request(app)
-        .post('/api/auth/login')
-        .send({ email, password: 'password123' });
-      expect(ok.status).toBe(200);
-    }
-
-    // Three failed attempts are answered normally...
-    for (let i = 0; i < 3; i += 1) {
-      // eslint-disable-next-line no-await-in-loop
-      const bad = await request(app)
-        .post('/api/auth/login')
-        .send({ email, password: 'wrong-password' });
-      expect(bad.status).toBe(401);
-    }
-
-    // ...and the next one is rate-limited, in the standard envelope.
-    const limited = await request(app)
+    // Requests #2 and #3 are answered normally — success or failure,
+    // they all count toward the same cap.
+    const ok = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'password123' });
+    expect(ok.status).toBe(200);
+    const bad = await request(app)
       .post('/api/auth/login')
       .send({ email, password: 'wrong-password' });
+    expect(bad.status).toBe(401);
+
+    // Request #4 crosses the cap: rate-limited, in the standard envelope.
+    const limited = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'password123' });
     expect(limited.status).toBe(429);
     expect(limited.body.error.code).toBe('RATE_LIMITED');
   });

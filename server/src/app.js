@@ -3,8 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
-const authRoutes = require('./routes/authRoutes');
-const teamRoutes = require('./routes/teamRoutes');
+const createAuthRouter = require('./routes/authRoutes');
+const createTeamRouter = require('./routes/teamRoutes');
 const { getStats } = require('./controllers/teamController');
 const asyncHandler = require('./utils/asyncHandler');
 const { makeLimiters } = require('./middleware/rateLimit');
@@ -30,7 +30,7 @@ function corsOptions() {
  */
 function createApp() {
   const app = express();
-  const { globalLimiter } = makeLimiters();
+  const { globalLimiter, authLimiter, writeLimiter } = makeLimiters();
 
   // Behind the host's proxy (Vercel) the real client IP is in
   // X-Forwarded-For; trust exactly one hop so rate limiting keys on the
@@ -57,8 +57,8 @@ function createApp() {
   });
 
   app.get('/api/stats', asyncHandler(getStats));
-  app.use('/api/auth', authRoutes);
-  app.use('/api/teams', teamRoutes);
+  app.use('/api/auth', createAuthRouter({ authLimiter }));
+  app.use('/api/teams', createTeamRouter({ writeLimiter }));
 
   // Unknown routes — same error envelope as everywhere else.
   app.use((req, res) =>

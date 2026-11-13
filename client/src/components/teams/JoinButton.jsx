@@ -23,13 +23,27 @@ export default function JoinButton({ team, user, onUpdate }) {
   const location = useLocation();
 
   // Order matters: membership first (a member of a full team is still
-  // "in"), then Full (truthful for guests too — no point sending them
-  // to log in for a seat that does not exist), then the guest prompt.
+  // "in"), then a pending join request (approval teams), then Full
+  // (truthful for guests too — no point sending them to log in for a
+  // seat that does not exist), then the guest prompt.
   if (user && team.isMember) {
     return (
       <button type="button" className="btn btn-block member-pill" disabled>
         <Check size={16} aria-hidden="true" /> You're in
       </button>
+    );
+  }
+
+  if (user && team.viewerApplication === 'pending') {
+    return (
+      <div>
+        <Button block disabled>
+          Request sent
+        </Button>
+        <p className="small muted" style={{ marginTop: 8 }}>
+          The owner will review your request.
+        </p>
+      </div>
     );
   }
 
@@ -64,7 +78,12 @@ export default function JoinButton({ team, user, onUpdate }) {
     try {
       const data = await teamsApi.join(team.id);
       onUpdate(data.team);
-      toast.success(`You joined ${team.name}.`);
+      if (data.application) {
+        // Approval team: the join became a request, not a seat.
+        toast.info('Request sent. The owner will review it.');
+      } else {
+        toast.success(`You joined ${team.name}.`);
+      }
     } catch (err) {
       if (err.code === 'TEAM_FULL') {
         onUpdate({ ...team, seatsLeft: 0, isFull: true, memberCount: team.capacity });
@@ -89,7 +108,13 @@ export default function JoinButton({ team, user, onUpdate }) {
 
   return (
     <Button block loading={joining} onClick={join}>
-      {joining ? 'Joining...' : 'Join team'}
+      {joining
+        ? team.requireApproval
+          ? 'Sending...'
+          : 'Joining...'
+        : team.requireApproval
+          ? 'Request to join'
+          : 'Join team'}
     </Button>
   );
 }

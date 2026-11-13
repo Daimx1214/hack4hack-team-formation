@@ -13,6 +13,7 @@ import TeamDetail from './pages/TeamDetail';
 import CreateTeam from './pages/CreateTeam';
 import EditTeam from './pages/EditTeam';
 import Dashboard from './pages/Dashboard';
+import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import { useToast } from './components/ui/Toast';
 import ProtectedRoute from './components/layout/ProtectedRoute';
@@ -44,6 +45,7 @@ const TITLES = [
   [/^\/login$/, 'Log in | TeamForge'],
   [/^\/register$/, 'Create your account | TeamForge'],
   [/^\/dashboard$/, 'My teams | TeamForge'],
+  [/^\/settings$/, 'Settings | TeamForge'],
 ];
 
 function TitleManager() {
@@ -137,6 +139,14 @@ function AppShell() {
             element={
               <ProtectedRoute user={user} sessionReady={sessionReady}>
                 <Dashboard user={user} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute user={user} sessionReady={sessionReady}>
+                <Settings user={user} onUserChange={setUser} onSignedOut={handleLogout} />
               </ProtectedRoute>
             }
           />

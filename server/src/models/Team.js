@@ -65,9 +65,20 @@ const teamSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    skillsNeeded: {
-      type: [String],
-      default: [],
+    // Invite code (Spec §2, NICE): a shareable code that joins this team
+    // via POST /teams/join-by-code. Only the owner ever sees it in API
+    // responses (the serializer enforces that); regenerating replaces it.
+    inviteCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    // Join approvals (Spec §2, NICE): when true, a join becomes a
+    // pending JoinApplication the owner must approve before the atomic
+    // join runs. Default false = the original one-click join.
+    requireApproval: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

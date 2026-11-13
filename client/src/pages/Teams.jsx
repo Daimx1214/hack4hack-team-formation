@@ -32,6 +32,8 @@ export default function Teams({ user }) {
   const [meta, setMeta] = useState(null);
   const [error, setError] = useState('');
   const [joiningId, setJoiningId] = useState(null);
+  const [code, setCode] = useState('');
+  const [codeBusy, setCodeBusy] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
   const debounce = useRef(null);
@@ -157,6 +159,55 @@ export default function Teams({ user }) {
             <option value="seats">Most seats left</option>
           </select>
         </div>
+
+        {user && (
+          <form
+            className="code-join"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!code.trim() || codeBusy) return;
+              setCodeBusy(true);
+              try {
+                const data = await teamsApi.joinByCode(code);
+                if (data.application) {
+                  toast.info('Request sent. The owner will review it.');
+                } else {
+                  toast.success(`You joined ${data.team.name}.`);
+                }
+                navigate(`/teams/${data.team.id}`);
+              } catch (err) {
+                if (err.status === 404) {
+                  toast.error('That invite code does not match a team.');
+                } else if (err.code === 'TEAM_FULL') {
+                  toast.warning('This team just filled up. Pick another one.');
+                } else if (err.code === 'ALREADY_MEMBER') {
+                  toast.info("You're already in this team.");
+                } else {
+                  toast.error(err.message || 'Something went wrong on our side.');
+                }
+              } finally {
+                setCodeBusy(false);
+              }
+            }}
+          >
+            <label className="small muted" htmlFor="invite-code-input">
+              Have an invite code?
+            </label>
+            <input
+              id="invite-code-input"
+              className="input code-input"
+              type="text"
+              placeholder="ABCD2345"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              autoComplete="off"
+              maxLength={32}
+            />
+            <Button type="submit" variant="secondary" loading={codeBusy}>
+              Join with code
+            </Button>
+          </form>
+        )}
 
         {meta && !error && (
           <p className="result-count">

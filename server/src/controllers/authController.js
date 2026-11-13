@@ -10,7 +10,12 @@ const {
   setRefreshCookie,
   clearRefreshCookie,
 } = require('../utils/tokens');
-const { registerSchema, loginSchema, parseOr400 } = require('../validators/schemas');
+const {
+  registerSchema,
+  loginSchema,
+  updateProfileSchema,
+  parseOr400,
+} = require('../validators/schemas');
 
 /**
  * Auth endpoints (Build Spec §10). register/login return the user and a
@@ -30,7 +35,7 @@ async function register(req, res) {
   const body = parseOr400(res, registerSchema, req.body ?? {});
   if (!body) return;
 
-  const { name, email, password, skills } = body;
+  const { name, email, password } = body;
 
   const existing = await User.findOne({ email });
   if (existing) {
@@ -43,7 +48,7 @@ async function register(req, res) {
   // the User model's pre-save hook replaces it with a bcrypt hash.
   let user;
   try {
-    user = await User.create({ name, email, passwordHash: password, skills });
+    user = await User.create({ name, email, passwordHash: password });
   } catch (err) {
     // Two registrations with the same email can race: both pass the
     // findOne check above, then the unique index rejects the second
@@ -69,15 +74,40 @@ async function login(req, res) {
   const { email, password } = body;
 
   // passwordHash is select:false on the model — login is the one place
-  // that genuinely needs it, so it opts in explicitly.
-  const user = await User.findOne({ email }).select('+passwordHash');
+  // that genuinely needs it, so it opts in explicitly. The lockout
+  // counters come along for the brute-force check below.
+  const user = await User.findOne({ email }).select(
+    '+passwordHash +failedLoginCount +lockedUntil'
+  );
   if (!user) {
+    return fail(res, 401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
+  }
+
+  // Brute-force lockout (Build Spec §11): after LOCK_THRESHOLD failed
+  // logins the account locks for LOCK_MINUTES. A locked account gets the
+  // SAME generic error — even for the correct password — so the lock
+  // itself never reveals that the account exists or that the password
+  // was right.
+  const LOCK_THRESHOLD = Number(process.env.LOGIN_LOCK_THRESHOLD || 5);
+  const LOCK_MINUTES = Number(process.env.LOGIN_LOCK_MINUTES || 15);
+  if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
     return fail(res, 401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
   }
 
   const matches = await user.comparePassword(password);
   if (!matches) {
+    const count = (user.failedLoginCount || 0) + 1;
+    const update =
+      count >= LOCK_THRESHOLD
+        ? { failedLoginCount: 0, lockedUntil: new Date(Date.now() + LOCK_MINUTES * 60 * 1000) }
+        : { failedLoginCount: count };
+    await User.updateOne({ _id: user._id }, update);
     return fail(res, 401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
+  }
+
+  // Success clears the slate.
+  if (user.failedLoginCount || user.lockedUntil) {
+    await User.updateOne({ _id: user._id }, { failedLoginCount: 0, lockedUntil: null });
   }
 
   return startSession(res, user, 200);
@@ -151,4 +181,27 @@ function me(req, res) {
   return res.status(200).json({ user: req.user });
 }
 
-module.exports = { register, login, refresh, logout, me };
+// PATCH /api/auth/me — settings page profile edit (Spec §5.7). Only the
+// display name can change; the strict schema rejects everything else.
+async function updateMe(req, res) {
+  const body = parseOr400(res, updateProfileSchema, req.body ?? {});
+  if (!body) return;
+  req.user.name = body.name;
+  await req.user.save();
+  return res.status(200).json({ user: req.user });
+}
+
+// POST /api/auth/logout-all — "sign out everywhere" (Spec §5.7): every
+// refresh token the user holds is revoked, so all other browsers and
+// devices lose their sessions at their next refresh. The caller's own
+// cookie is cleared too; their access token dies with this response.
+async function logoutAll(req, res) {
+  await RefreshToken.updateMany(
+    { user: req.user._id, revokedAt: null },
+    { $set: { revokedAt: new Date() } }
+  );
+  clearRefreshCookie(res);
+  return res.status(204).send();
+}
+
+module.exports = { register, login, refresh, logout, me, updateMe, logoutAll };

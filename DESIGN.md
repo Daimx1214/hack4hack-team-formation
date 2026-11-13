@@ -43,8 +43,8 @@ the gap: the check and the write must be a single indivisible operation.
 | -------------- | -------- | ------------------------------ |
 | `name`         | String   | required                       |
 | `email`        | String   | required, unique, lowercased   |
-| `passwordHash` | String   | bcrypt hash, never returned    |
-| `skills`       | [String] | optional profile info          |
+| `passwordHash` | String   | bcrypt hash (cost 12), `select: false`, never returned |
+| `failedLoginCount` / `lockedUntil` | Number / Date | brute-force lockout state (5 fails → 15 min), `select: false` |
 | timestamps     | Date     | `createdAt` / `updatedAt`      |
 
 ### Team
@@ -57,7 +57,8 @@ the gap: the check and the write must be a single indivisible operation.
 | `capacity`    | Number   | 2–12, editable by the owner, never below the member count (see §3.3) |
 | `members`     | [Member] | embedded subdocuments: `{ user, role, joinedAt }` |
 | `memberCount` | Number   | denormalised counter, always updated atomically with `members` |
-| `skillsNeeded`| [String] | optional                                          |
+| `inviteCode`  | String   | unique, sparse; shown only to the owner; regenerated on demand |
+| `requireApproval` | Boolean | when true, joins become JoinApplications until the owner approves |
 | timestamps    | Date     |                                                   |
 
 `members` is embedded in the team document on purpose: the whole membership
@@ -94,6 +95,25 @@ and two *different* users may safely reuse the same key string.
 Refresh tokens are opaque random strings (not JWTs) precisely so they can
 be revoked: rotation marks the old record revoked and points it at its
 replacement; presenting a revoked token is refused with `401`.
+
+### JoinApplication (approval request)
+
+| Field       | Type     | Notes                                        |
+| ----------- | -------- | ---------------------------------------------------- |
+| `team` / `user` | ObjectId | the team asked to join, and who asked        |
+| `status`    | String   | `pending` → `approved` / `rejected`          |
+| `decidedAt` / `decidedBy` | Date / ObjectId | when the owner decided, and who     |
+
+A partial unique index allows only ONE pending application per
+(team, user). Approving runs the same atomic join for the applicant —
+if the team filled up in the meantime, approval returns `409 TEAM_FULL`
+and the request stays pending; the seat logic never changes.
+
+### AuditLog
+
+`{ actor, action, team, at }` rows for `create` / `join` / `leave` /
+`delete`, written fire-and-forget from the team controller — an audit
+failure can never fail the action it describes.
 
 ## 3. Concurrency strategy
 
@@ -235,13 +255,20 @@ a machine-readable `code`. Every response carries an `X-Request-Id`.
 | POST   | `/auth/refresh`        | cookie | 200 `{ accessToken }` + rotated cookie | 401 `INVALID_REFRESH`, 403 bad origin |
 | POST   | `/auth/logout`         | cookie | 204 (token revoked, cookie cleared) | 403 bad origin |
 | GET    | `/auth/me`             | JWT  | 200 `{ user }` | 401 |
+| PATCH  | `/auth/me`             | JWT  | 200 `{ user }` — settings: display name only | 400 `VALIDATION`, 401 |
+| POST   | `/auth/logout-all`     | JWT  | 204 — every refresh token of the user revoked | 401 |
 | GET    | `/health`              | –    | 200 `{ status, uptime, db }` | 503 when the DB is down |
-| POST   | `/teams`               | JWT  | 201 `{ team }` (creator is owner + member #1) | 400 `VALIDATION`, 401 |
+| POST   | `/teams`               | JWT  | 201 `{ team }` (creator is owner + member #1) | 400 `VALIDATION`, 401, 409 `ONE_TEAM_LIMIT` (flag on) |
 | GET    | `/teams`               | optional | 200 `{ data, meta }` — `?q=&status=open\|full&sort=newest\|seats&page=&limit=` | 400 `VALIDATION` |
 | GET    | `/teams/mine`          | JWT  | 200 `{ data }` — `?role=joined\|created` | 401 |
-| GET    | `/teams/:id`           | optional | 200 `{ team }` | 400 `INVALID_ID`, 404 `NOT_FOUND` |
+| GET    | `/teams/:id`           | optional | 200 `{ team }` (owners also see `inviteCode`; viewers see their `viewerApplication`) | 400 `INVALID_ID`, 404 `NOT_FOUND` |
 | PATCH  | `/teams/:id`           | JWT (owner) | 200 `{ team }` | 403 `FORBIDDEN`, 409 `CAPACITY_BELOW_MEMBERS`, 404 |
-| POST   | `/teams/:id/join`      | JWT  | 201 `{ team }` first join; 200 + `Idempotent-Replay` on replay | 400 `MISSING_IDEMPOTENCY_KEY`, 401, 404, 409 `TEAM_FULL` / `ALREADY_MEMBER` / `REQUEST_IN_PROGRESS` |
+| POST   | `/teams/:id/join`      | JWT  | 201 `{ team }` first join; 200 + `Idempotent-Replay` on replay; 202 `{ application }` on approval teams | 400 `MISSING_IDEMPOTENCY_KEY`, 401, 404, 409 `TEAM_FULL` / `ALREADY_MEMBER` / `REQUEST_IN_PROGRESS` / `ONE_TEAM_LIMIT` |
+| POST   | `/teams/join-by-code`  | JWT  | same as join, addressed by invite code | 404 unknown code, plus join's errors |
+| POST   | `/teams/:id/invite-code` | JWT (owner) | 200 `{ inviteCode }` — regenerates; the old code dies | 403, 404 |
+| GET    | `/teams/:id/applications` | JWT (owner) | 200 `{ data }` — pending first | 403, 404 |
+| POST   | `/teams/:id/applications/:appId/approve` | JWT (owner) | 200 `{ team }` — runs the atomic join for the applicant | 403, 404, 409 `TEAM_FULL` / `APPLICATION_DECIDED` |
+| POST   | `/teams/:id/applications/:appId/reject` | JWT (owner) | 200 `{ application }` | 403, 404, 409 `APPLICATION_DECIDED` |
 | DELETE | `/teams/:id/leave`     | JWT  | 200 `{ team }` | 403 `OWNER_CANNOT_LEAVE`, 404, 409 `NOT_A_MEMBER` |
 | DELETE | `/teams/:id`           | JWT (owner) | 204 | 403 `FORBIDDEN`, 404 |
 | GET    | `/stats`               | –    | 200 `{ teams, members, openSeats }` | – |
@@ -254,9 +281,13 @@ in memory only and silently refreshes once on a `401`. Passwords are
 hashed with bcrypt (cost 12); the hash is never selected into responses
 (`select: false` + the model's `toJSON` transform). Security headers come
 from helmet, CORS is an exact-origin allowlist with credentials, and rate
-limits cap auth attempts (10 failures / 15 min / IP), writes (60 / min /
-user) and overall traffic (300 / 15 min / IP) — all `429` in the same
-error envelope. Full requirement mapping: Build Spec §9–§11.
+limits cap auth requests (10 / 15 min / IP, counting every request),
+writes (60 / min / user) and overall traffic (300 / 15 min / IP) — all
+`429` in the same error envelope. Behind the IP cap sits a per-account
+brute-force lockout: 5 failed logins lock the account for 15 minutes,
+and a locked account answers the same generic `401` even to the correct
+password, so the lock reveals nothing. Full requirement mapping: Build
+Spec §9–§11.
 
 ## 5. Testing strategy
 
@@ -305,14 +336,27 @@ Test files (in `server/tests/`):
   and the error envelope shape.
 - `security.test.js` — helmet headers present, CORS reflects only
   allowlisted origins, oversized JSON body → `413`, auth rate limit →
-  `429` after the failure cap.
+  `429` once the per-IP request cap is used up.
 - `session.test.js` — the refresh lifecycle over a cookie-keeping agent:
   login sets an httpOnly cookie, refresh rotates it and the old cookie is
   rejected, logout revokes, a foreign `Origin` on refresh/logout → `403`.
+- `lockout.test.js` — the per-account lockout: 5 failed logins lock the
+  account (correct password still gets the generic `401`), expiry lets
+  the user back in, and a success resets the counter.
+- `settings.test.js` — `PATCH /auth/me` (name change; unknown fields
+  `400`), and `logout-all` revoking a second browser's session too.
+- `approvals.test.js` — invite codes (owner-only visibility, join by
+  code, regeneration kills the old code) and the approval flow
+  (application → approve runs the atomic join; full-at-approval `409`;
+  reject → re-apply).
+- `nice-features.test.js` — the `ONE_TEAM_PER_USER` flag (409 on a
+  second create/join while on, unaffected while off) and the audit log
+  recording create / join / leave / delete.
 
-**83 API tests, all passing**, all running in CI
+**94 API tests, all passing**, all running in CI
 (`.github/workflows/ci.yml`) on every push and pull request — well past
-the PS1 requirement of 20+.
+the PS1 requirement of 20+. The client has 11 Vitest component tests
+for the seat meter and the join button's state machine.
 
 ## 6. Load test
 

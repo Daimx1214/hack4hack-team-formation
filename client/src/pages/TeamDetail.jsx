@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ChevronRight, Pencil, SearchX, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Copy, Pencil, RefreshCw, SearchX, Trash2, X } from 'lucide-react';
 import { teamsApi } from '../api';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
@@ -29,6 +29,9 @@ export default function TeamDetail({ user }) {
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null); // 'leave' | 'delete'
   const [acting, setActing] = useState(false);
+  const [applications, setApplications] = useState(null);
+  const [deciding, setDeciding] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const load = useCallback(() => {
     setError('');
@@ -58,6 +61,62 @@ export default function TeamDetail({ user }) {
   useEffect(() => {
     if (team) document.title = `${team.name} | TeamForge`;
   }, [team]);
+
+  // Owners of any team get the review queue (join applications). Loaded
+  // once the team — and with it isOwner — is known.
+  const loadApplications = useCallback(() => {
+    teamsApi
+      .applications(id)
+      .then((data) => setApplications(data.data))
+      .catch(() => setApplications([]));
+  }, [id]);
+
+  useEffect(() => {
+    if (team && team.isOwner) loadApplications();
+  }, [team, loadApplications]);
+
+  async function decide(applicationId, action) {
+    setDeciding(applicationId);
+    try {
+      if (action === 'approve') {
+        const data = await teamsApi.approve(id, applicationId);
+        setTeam(data.team);
+        toast.success('Request approved.');
+      } else {
+        await teamsApi.reject(id, applicationId);
+        toast.success('Request declined.');
+      }
+      loadApplications();
+    } catch (err) {
+      if (err.code === 'TEAM_FULL') {
+        toast.warning('This team just filled up. Pick another one.');
+      } else {
+        toast.error(err.message || 'Something went wrong on our side.');
+      }
+    } finally {
+      setDeciding(null);
+    }
+  }
+
+  async function copyInviteCode() {
+    try {
+      await navigator.clipboard.writeText(team.inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Copy failed. Select the code and copy it manually.');
+    }
+  }
+
+  async function regenerateCode() {
+    try {
+      const data = await teamsApi.regenerateCode(id);
+      setTeam((prev) => ({ ...prev, inviteCode: data.inviteCode }));
+      toast.success('New invite code generated. The old one no longer works.');
+    } catch (err) {
+      toast.error(err.message || 'Something went wrong on our side.');
+    }
+  }
 
   async function leave() {
     setActing(true);
@@ -168,15 +227,6 @@ export default function TeamDetail({ user }) {
               ) : (
                 <p className="muted">No description yet.</p>
               )}
-              {team.skillsNeeded && team.skillsNeeded.length > 0 && (
-                <div className="skill-chips" style={{ marginTop: 16 }}>
-                  {team.skillsNeeded.map((skill) => (
-                    <span key={skill} className="skill-chip">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              )}
             </section>
 
             <section className="detail-section" aria-labelledby="members-heading">
@@ -192,6 +242,75 @@ export default function TeamDetail({ user }) {
                 ))}
               </ul>
             </section>
+
+            {team.isOwner && (
+              <section className="detail-section" aria-labelledby="owner-tools-heading">
+                <h2 id="owner-tools-heading">Invite and requests</h2>
+                {team.inviteCode && (
+                  <div style={{ marginBottom: 20 }}>
+                    <p className="small muted" style={{ marginBottom: 8 }}>
+                      Anyone with this code can join from the Teams page. Only you can
+                      see it.
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <code className="invite-code">{team.inviteCode}</code>
+                      <Button size="sm" variant="secondary" onClick={copyInviteCode}>
+                        {copied ? (
+                          <>
+                            <Check size={14} aria-hidden="true" /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={14} aria-hidden="true" /> Copy
+                          </>
+                        )}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={regenerateCode}>
+                        <RefreshCw size={14} aria-hidden="true" /> New code
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {applications === null ? (
+                  <p className="small muted">Loading requests...</p>
+                ) : applications.filter((a) => a.status === 'pending').length === 0 ? (
+                  <p className="small muted">
+                    {team.requireApproval
+                      ? 'No join requests waiting. Requests will appear here when someone asks to join.'
+                      : 'No join requests. Turn on join approval in Edit team to review requests before seats are taken.'}
+                  </p>
+                ) : (
+                  <ul className="member-list">
+                    {applications
+                      .filter((a) => a.status === 'pending')
+                      .map((application) => (
+                        <li className="member-row" key={application.id}>
+                          <Avatar user={application.user} />
+                          <span className="member-name">{application.user.name}</span>
+                          <span className="joined-at">asked {formatDate(application.createdAt)}</span>
+                          <span style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
+                            <Button
+                              size="sm"
+                              loading={deciding === application.id}
+                              onClick={() => decide(application.id, 'approve')}
+                            >
+                              <Check size={14} aria-hidden="true" /> Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={deciding === application.id}
+                              onClick={() => decide(application.id, 'reject')}
+                            >
+                              <X size={14} aria-hidden="true" /> Decline
+                            </Button>
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </section>
+            )}
           </div>
 
           <aside className="side-card" aria-label="Seats and actions">
@@ -225,9 +344,11 @@ export default function TeamDetail({ user }) {
                     Leave team
                   </button>
                 )}
-                {!team.isMember && !team.isFull && user && (
+                {!team.isMember && !team.isFull && user && !team.viewerApplication && (
                   <p className="small muted" style={{ marginTop: 12 }}>
-                    Joining takes the seat immediately. You can leave any time.
+                    {team.requireApproval
+                      ? 'The owner reviews every request before a seat is taken.'
+                      : 'Joining takes the seat immediately. You can leave any time.'}
                   </p>
                 )}
               </>
