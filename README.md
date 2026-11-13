@@ -1,3 +1,5 @@
+<p align="center"><img src="client/public/logo.png" alt="TeamForge logo" width="150"></p>
+
 # Hack4Hack PS1 — Race-Proof Team Formation Platform
 
 A team-formation platform for hackathons where **concurrent join/create
@@ -135,7 +137,7 @@ session suite (refresh rotation, logout revocation), settings
 lock the account), join approvals and invite codes — plus the
 concurrency suite that proves the race-proofing: join/leave stampedes
 (20 racers for 1 seat; 50 racers for 4 seats), duplicate-registration
-races, and idempotency-key retry storms. The client adds **11 component
+races, and idempotency-key retry storms. The client adds **12 component
 tests** (Vitest + Testing Library) for the seat meter and the join
 button's state machine (`cd client && npm test`).
 
