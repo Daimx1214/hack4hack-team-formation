@@ -34,6 +34,28 @@ function ScrollManager() {
   return null;
 }
 
+// Per-route document titles (Build Spec §7). The team detail page sets
+// its own title once the team loads ("<name> | TeamForge").
+const TITLES = [
+  [/^\/$/, 'TeamForge — Race-Proof Team Formation'],
+  [/^\/teams$/, 'Browse teams | TeamForge'],
+  [/^\/teams\/new$/, 'Create a team | TeamForge'],
+  [/^\/teams\/[^/]+\/edit$/, 'Edit team | TeamForge'],
+  [/^\/login$/, 'Log in | TeamForge'],
+  [/^\/register$/, 'Create your account | TeamForge'],
+  [/^\/dashboard$/, 'My teams | TeamForge'],
+];
+
+function TitleManager() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (/^\/teams\/[^/]+$/.test(pathname)) return; // detail page names itself
+    const match = TITLES.find(([re]) => re.test(pathname));
+    document.title = match ? match[1] : "This page doesn't exist | TeamForge";
+  }, [pathname]);
+  return null;
+}
+
 // The app keeps the logged-in user in state at the top level and passes
 // `user` / `onAuth` down to pages. Simple prop drilling is fine at this size.
 function AppShell() {
@@ -91,6 +113,7 @@ function AppShell() {
   return (
     <div className="app">
       <ScrollManager />
+      <TitleManager />
       <a href="#main" className="skip-link">
         Skip to content
       </a>

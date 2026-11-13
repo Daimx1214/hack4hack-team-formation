@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /teams
+Disallow: /dashboard
+Disallow: /settings
+
+Sitemap: https://hack4hack-web.vercel.app/sitemap.xml

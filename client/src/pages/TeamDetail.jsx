@@ -55,6 +55,10 @@ export default function TeamDetail({ user }) {
     load();
   }, [load, viewerId]);
 
+  useEffect(() => {
+    if (team) document.title = `${team.name} | TeamForge`;
+  }, [team]);
+
   async function leave() {
     setActing(true);
     try {

@@ -17,6 +17,17 @@ Deployed Nov 13, 2026, entirely on free tiers: the API runs as Vercel
 serverless functions pinned to Mumbai (`bom1`), next to the database on
 MongoDB Atlas (M0); the client is a Vercel static build.
 
+## Screenshots
+
+The UI follows a written design system (Geist type, neutral surfaces,
+one ember accent) with light, dark and system themes.
+
+![TeamForge landing page, light theme](docs/screenshots/landing-light.png)
+
+![TeamForge landing page, dark theme](docs/screenshots/landing-dark.png)
+
+![Browsing teams with live seat meters](docs/screenshots/teams-light.png)
+
 ## Why this is interesting
 
 The naive way to add a member is:
@@ -36,10 +47,10 @@ operation** (see `DESIGN.md` for the full explanation).
 
 | Layer    | Choice                              |
 | -------- | ----------------------------------- |
-| Frontend | React (Vite)                        |
+| Frontend | React (Vite) — design system, light/dark themes |
 | Backend  | Node.js + Express                   |
 | Database | MongoDB + Mongoose                  |
-| Auth     | JWT (register / login)              |
+| Auth     | 15-min access JWT + rotating refresh-token cookie (httpOnly, hashed at rest) |
 | Tests    | Jest + Supertest + mongodb-memory-server |
 | CI       | GitHub Actions                      |
 | Load test| Artillery (config + results in `load/`) |
@@ -70,21 +81,20 @@ You need a MongoDB connection string. Easiest options:
 
 ```bash
 cd server
-cp .env.example .env     # then fill in MONGO_URI and JWT_SECRET
+cp .env.example .env     # then fill in MONGO_URI and JWT_ACCESS_SECRET
 npm install
-npm run dev              # http://localhost:5000
+npm run dev              # http://localhost:4000
 ```
 
 ### 3. Client
 
 ```bash
 cd client
+cp .env.example .env     # VITE_API_URL points at the live API; for local
+                         # development set it to http://localhost:4000
 npm install
 npm run dev              # http://localhost:5173
 ```
-
-The client talks to the API at `http://localhost:5000/api` by default
-(override with `VITE_API_URL` in `client/.env`).
 
 ### 4. Tests
 
@@ -93,11 +103,14 @@ cd server
 npm test
 ```
 
-**53 API tests, all passing** — happy paths, edge cases (duplicate email
+**83 API tests, all passing** — happy paths, edge cases (duplicate email
 `409`, forged/missing tokens `401`, deleted-team `404`s, capacity
-boundaries) and the concurrency suite that proves the race-proofing:
-join/leave stampedes, duplicate-registration races, and idempotency-key
-retry storms.
+boundaries), the contract suite (search/filter/pagination, owner edits,
+stats), the security suite (helmet, CORS allowlist, rate limits) and the
+session suite (refresh rotation, logout revocation) — plus the
+concurrency suite that proves the race-proofing: join/leave stampedes
+(20 racers for 1 seat; 50 racers for 4 seats), duplicate-registration
+races, and idempotency-key retry storms.
 
 The tests do **not** need a running MongoDB — they use
 `mongodb-memory-server`, which starts a throwaway in-memory MongoDB,
@@ -151,15 +164,20 @@ recorded honestly in `load/results-live.txt`.
 
 | Method | Endpoint              | Auth | Description                          |
 | ------ | --------------------- | ---- | ------------------------------------ |
-| POST   | `/api/auth/register`  | –    | Create an account, returns JWT       |
-| POST   | `/api/auth/login`     | –    | Log in, returns JWT                  |
+| POST   | `/api/auth/register`  | –    | Create an account (access JWT + refresh cookie) |
+| POST   | `/api/auth/login`     | –    | Log in (one generic error for bad credentials) |
+| POST   | `/api/auth/refresh`   | cookie | Rotate the refresh token, get a fresh access JWT |
+| POST   | `/api/auth/logout`    | cookie | Revoke the refresh token, clear the cookie |
 | GET    | `/api/auth/me`        | JWT  | Current user                         |
-| GET    | `/api/health`         | –    | Health check                         |
+| GET    | `/api/health`         | –    | Health check (status, uptime, db)    |
+| GET    | `/api/stats`          | –    | Live counts: teams, members, open seats |
 | POST   | `/api/teams`          | JWT  | Create a team (creator = owner, member #1) |
-| GET    | `/api/teams`          | –    | List teams                           |
+| GET    | `/api/teams`          | –    | List teams — search, status filter, sort, pagination |
+| GET    | `/api/teams/mine`     | JWT  | Your teams (`?role=joined\|created`) |
 | GET    | `/api/teams/:id`      | –    | One team                             |
-| POST   | `/api/teams/:id/join` | JWT  | **Join a team (race-proof)** — supports `Idempotency-Key` header |
-| POST   | `/api/teams/:id/leave`| JWT  | Leave a team                         |
+| PATCH  | `/api/teams/:id`      | JWT  | Edit a team (owner only; capacity never below member count) |
+| POST   | `/api/teams/:id/join` | JWT  | **Join a team (race-proof)** — requires an `Idempotency-Key` (UUID) header |
+| DELETE | `/api/teams/:id/leave`| JWT  | Leave a team                         |
 | DELETE | `/api/teams/:id`      | JWT  | Delete a team (owner only)           |
 
 ## The race-proof guarantee
@@ -170,8 +188,8 @@ recorded honestly in `load/results-live.txt`.
 Team.findOneAndUpdate(
   {
     _id: teamId,
-    memberCount: { $lt: capacity },        // still has a free seat
-    'members.user': { $ne: userId },       // not already a member
+    $expr: { $lt: ['$memberCount', '$capacity'] }, // still has a free seat
+    'members.user': { $ne: userId },               // not already a member
   },
   {
     $push: { members: { user: userId, role: 'member' } },
@@ -180,6 +198,11 @@ Team.findOneAndUpdate(
   { new: true }
 );
 ```
+
+The seat check compares the counter against the team's **own capacity
+field inside the same atomic operation** (`$expr`) — never against a
+value read earlier in JavaScript — so even an owner editing the team's
+capacity a millisecond before a join cannot open a stale-limit window.
 
 MongoDB guarantees that one update on one document is atomic: the conditions
 and the write succeed or fail **together**. Two racing requests are
