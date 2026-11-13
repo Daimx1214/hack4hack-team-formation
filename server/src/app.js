@@ -59,6 +59,21 @@ function createApp() {
   app.get('/api/stats', asyncHandler(getStats));
   app.use('/api/auth', createAuthRouter({ authLimiter }));
   app.use('/api/teams', createTeamRouter({ writeLimiter }));
+  // Root — a small signpost so the bare API URL answers with something
+  // useful instead of a platform 404 (vercel.json rewrites "/" here).
+  app.get(['/', '/api'], (req, res) => {
+    res.json({
+      name: 'TeamForge API',
+      status: 'ok',
+      frontend: 'https://hack4hack-web.vercel.app',
+      endpoints: {
+        health: '/api/health',
+        stats: '/api/stats',
+        teams: '/api/teams',
+        auth: '/api/auth',
+      },
+    });
+  });
 
   // Unknown routes — same error envelope as everywhere else.
   app.use((req, res) =>
