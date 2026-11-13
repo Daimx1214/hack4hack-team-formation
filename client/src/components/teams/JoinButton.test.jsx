@@ -86,4 +86,21 @@ describe('JoinButton states', () => {
     expect(teamsApi.join).toHaveBeenCalledWith('team-1');
     expect(onUpdate).toHaveBeenCalledWith(fresh);
   });
+  it('refetches after a TEAM_FULL rejection so the members list catches up', async () => {
+    const full = Object.assign(new Error('This team just filled up. Pick another one.'), { code: 'TEAM_FULL' });
+    teamsApi.join.mockRejectedValueOnce(full);
+    const fresh = team({ memberCount: 4, seatsLeft: 0, isFull: true });
+    teamsApi.get.mockResolvedValueOnce({ team: fresh });
+    const onUpdate = vi.fn();
+    render(
+      <MemoryRouter>
+      <ToastProvider>
+        <JoinButton team={team()} user={user} onUpdate={onUpdate} />
+      </ToastProvider>
+      </MemoryRouter>
+  );
+    await userEvent.click(screen.getByRole('button', { name: 'Join team' }));
+    expect(teamsApi.get).toHaveBeenCalledWith('team-1');
+    expect(onUpdate).toHaveBeenLastCalledWith(fresh);
+  });
 });
