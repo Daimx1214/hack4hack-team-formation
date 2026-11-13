@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { authApi, getToken, setToken } from './api';
+import { authApi, hasSessionHint, setToken } from './api';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Teams from './pages/Teams';
@@ -54,13 +54,16 @@ export default function App() {
     }
   }, [theme]);
 
-  // On first load, if a token exists, ask the API who we are.
+  // On first load, silently restore the session: the refresh cookie is
+  // the credential — exchange it for a fresh access token, then ask the
+  // API who we are. Any failure just means "logged out".
   useEffect(() => {
-    if (!getToken()) return;
+    if (!hasSessionHint()) return;
     authApi
-      .me()
+      .refresh()
+      .then(() => authApi.me())
       .then((data) => setUser(data.user))
-      .catch(() => setToken(null)); // stale token — clear it
+      .catch(() => setToken(null));
   }, []);
 
   function handleAuth(data) {
@@ -70,6 +73,9 @@ export default function App() {
   }
 
   function handleLogout() {
+    // Revoke the refresh token server-side (fire and forget — the local
+    // session ends either way).
+    authApi.logout().catch(() => {});
     setToken(null);
     setUser(null);
     navigate('/');

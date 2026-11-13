@@ -1,17 +1,31 @@
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken');
 const { fail } = require('../utils/errors');
+const { isAllowedOrigin } = require('../utils/origins');
+const {
+  REFRESH_COOKIE,
+  signAccessToken,
+  hashToken,
+  issueRefreshToken,
+  setRefreshCookie,
+  clearRefreshCookie,
+} = require('../utils/tokens');
 const { registerSchema, loginSchema, parseOr400 } = require('../validators/schemas');
 
-// Sign an access token for a user. The token carries only the user id —
-// everything else is loaded fresh from the database by the auth middleware.
-// (Refresh-token rotation arrives with the session work; this JWT is the
-// access token of the API contract.)
-function signToken(userId) {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+/**
+ * Auth endpoints (Build Spec §10). register/login return the user and a
+ * short-lived access token, and set the rotating refresh token as an
+ * httpOnly cookie. See utils/tokens.js for the session design.
+ */
+
+// Start a fresh session: new refresh record + cookie + access token.
+async function startSession(res, user, status) {
+  const { raw } = await issueRefreshToken(user._id);
+  setRefreshCookie(res, raw);
+  return res.status(status).json({ user, accessToken: signAccessToken(user._id) });
 }
 
-// POST /api/auth/register — create an account, return the user + token.
+// POST /api/auth/register — create an account and sign the user in.
 async function register(req, res) {
   const body = parseOr400(res, registerSchema, req.body ?? {});
   if (!body) return;
@@ -41,10 +55,10 @@ async function register(req, res) {
     throw err;
   }
 
-  return res.status(201).json({ user, accessToken: signToken(user._id) });
+  return startSession(res, user, 201);
 }
 
-// POST /api/auth/login — verify credentials, return the user + token.
+// POST /api/auth/login — verify credentials and start a session.
 // The failure message is deliberately generic ("Email or password is
 // incorrect") for BOTH unknown email and wrong password, so the endpoint
 // cannot be used to probe which accounts exist.
@@ -64,7 +78,69 @@ async function login(req, res) {
     return fail(res, 401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
   }
 
-  return res.status(200).json({ user, accessToken: signToken(user._id) });
+  return startSession(res, user, 200);
+}
+
+// Read the presented refresh token's record, or null when it is missing,
+// unknown, revoked or expired.
+async function presentedRefreshRecord(req) {
+  const raw = req.cookies ? req.cookies[REFRESH_COOKIE] : null;
+  if (!raw) return null;
+  const record = await RefreshToken.findOne({ tokenHash: hashToken(raw) });
+  if (!record || record.revokedAt || record.expiresAt.getTime() < Date.now()) return null;
+  return record;
+}
+
+// Cookie-based endpoints are the one place a browser sends a credential
+// automatically, so they get the CSRF guard from Spec §11: when an Origin
+// header is present it must be on the allowlist.
+function originRejected(req, res) {
+  if (isAllowedOrigin(req.headers.origin)) return false;
+  fail(res, 403, 'FORBIDDEN', "You don't have permission to do that");
+  return true;
+}
+
+// POST /api/auth/refresh — rotate: the presented refresh token is revoked
+// and replaced; the response carries a fresh access token (and cookie).
+async function refresh(req, res) {
+  if (originRejected(req, res)) return;
+
+  const record = await presentedRefreshRecord(req);
+  if (!record) {
+    clearRefreshCookie(res);
+    return fail(res, 401, 'INVALID_REFRESH', 'Your session has expired. Log in again.');
+  }
+
+  const user = await User.findById(record.user);
+  if (!user) {
+    clearRefreshCookie(res);
+    return fail(res, 401, 'INVALID_REFRESH', 'Your session has expired. Log in again.');
+  }
+
+  const { raw, record: next } = await issueRefreshToken(user._id);
+  record.revokedAt = new Date();
+  record.replacedBy = next._id;
+  await record.save();
+
+  setRefreshCookie(res, raw);
+  return res.status(200).json({ accessToken: signAccessToken(user._id) });
+}
+
+// POST /api/auth/logout — revoke the presented refresh token and clear
+// the cookie. Always 204: logging out must not leak whether a session
+// existed.
+async function logout(req, res) {
+  if (originRejected(req, res)) return;
+
+  const raw = req.cookies ? req.cookies[REFRESH_COOKIE] : null;
+  if (raw) {
+    await RefreshToken.updateOne(
+      { tokenHash: hashToken(raw), revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    );
+  }
+  clearRefreshCookie(res);
+  return res.status(204).send();
 }
 
 // GET /api/auth/me — return the currently logged-in user (auth middleware
@@ -73,4 +149,4 @@ function me(req, res) {
   return res.status(200).json({ user: req.user });
 }
 
-module.exports = { register, login, me };
+module.exports = { register, login, refresh, logout, me };

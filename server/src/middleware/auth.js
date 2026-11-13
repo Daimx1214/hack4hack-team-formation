@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { fail } = require('../utils/errors');
+const { accessSecret } = require('../utils/tokens');
 
 /**
  * Auth middleware, two flavours:
@@ -23,7 +24,7 @@ async function requireAuth(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, accessSecret());
     const user = await User.findById(payload.userId);
     if (!user) {
       return fail(res, 401, 'UNAUTHORIZED', 'User no longer exists');
@@ -41,7 +42,7 @@ async function optionalAuth(req, res, next) {
   if (!token) return next();
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, accessSecret());
     const user = await User.findById(payload.userId);
     if (user) req.user = user;
   } catch (err) {

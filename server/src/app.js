@@ -1,22 +1,20 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 const authRoutes = require('./routes/authRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const { getStats } = require('./controllers/teamController');
 const asyncHandler = require('./utils/asyncHandler');
 const { makeLimiters } = require('./middleware/rateLimit');
+const { allowedOrigins } = require('./utils/origins');
 
 // CORS allowlist (Spec §11): exact origins only, from the CORS_ORIGINS
 // env var (comma-separated). Requests without an Origin header (curl,
 // server-to-server, tests) are not CORS requests and pass through.
-const DEFAULT_ORIGINS = 'http://localhost:5173,https://hack4hack-web.vercel.app';
 function corsOptions() {
-  const allowed = (process.env.CORS_ORIGINS || DEFAULT_ORIGINS)
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const allowed = allowedOrigins();
   return {
     origin(origin, callback) {
       if (!origin || allowed.includes(origin)) return callback(null, true);
@@ -43,6 +41,7 @@ function createApp() {
   app.use(helmet());
   app.use(cors(corsOptions()));
   app.use(globalLimiter);
+  app.use(cookieParser());
   app.use(express.json({ limit: '10kb' }));
 
   // Health: reports process uptime and whether the database connection is
