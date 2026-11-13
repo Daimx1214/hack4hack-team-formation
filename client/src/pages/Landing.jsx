@@ -137,16 +137,22 @@ export default function Landing({ user }) {
   const [preview, setPreview] = useState(null);
   const [openFaq, setOpenFaq] = useState(null);
 
+  // Stats are viewer-independent (fetch once); the team preview is
+  // refetched when the session resolves so member states are right.
   useEffect(() => {
     statsApi
       .get()
       .then(setStats)
       .catch(() => setStats(null));
+  }, []);
+
+  const viewerId = user?.id || null;
+  useEffect(() => {
     teamsApi
       .list({ status: 'open', sort: 'newest', limit: 3 })
       .then((data) => setPreview(data.data))
       .catch(() => setPreview([]));
-  }, []);
+  }, [viewerId]);
 
   return (
     <div>

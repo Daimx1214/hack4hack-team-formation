@@ -50,10 +50,13 @@ export default function Teams({ user }) {
       });
   }, [q, status, sort, page]);
 
+  // Refetch when the session resolves (see TeamDetail): card member
+  // states are computed from the viewer's token.
+  const viewerId = user?.id || null;
   useEffect(() => {
     setTeams(null);
     load();
-  }, [load]);
+  }, [load, viewerId]);
 
   // Keep the input in sync when the URL changes elsewhere (Back button).
   useEffect(() => {
