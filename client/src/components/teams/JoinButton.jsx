@@ -88,6 +88,11 @@ export default function JoinButton({ team, user, onUpdate }) {
       if (err.code === 'TEAM_FULL') {
         onUpdate({ ...team, seatsLeft: 0, isFull: true, memberCount: team.capacity });
         toast.warning('This team just filled up. Pick another one.');
+        // The optimistic update above keeps the stale members list (it
+        // predates whoever took the last seat) — refetch so the list
+        // matches the count a moment later.
+        const fresh = await teamsApi.get(team.id).catch(() => null);
+        if (fresh) onUpdate(fresh.team);
       } else if (err.code === 'ALREADY_MEMBER') {
         toast.info("You're already in this team.");
         const fresh = await teamsApi.get(team.id).catch(() => null);
