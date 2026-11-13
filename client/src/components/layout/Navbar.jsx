@@ -107,7 +107,7 @@ export default function Navbar({ user, onLogout }) {
               )}
             </div>
           ) : (
-            <span className="nav-auth-desktop" style={{ display: 'inline-flex', gap: 8 }}>
+            <span className="nav-auth-desktop">
               <Link to="/login">
                 <Button variant="ghost">Log in</Button>
               </Link>

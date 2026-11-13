@@ -81,6 +81,17 @@ export function refreshSession() {
   return refreshInFlight;
 }
 
+// When a session truly ends mid-use (refresh rejected), the app shell
+// listens for this event and follows the Spec §5.8 contract: toast
+// 'Your session expired' and redirect to /login?returnTo=<here>.
+function notifySessionExpired() {
+  try {
+    window.dispatchEvent(new CustomEvent('tf:session-expired'));
+  } catch {
+    // Non-browser environment — nothing to notify.
+  }
+}
+
 async function api(path, options = {}) {
   const res = await rawFetch(path, options);
   if (res.status === 401 && !path.startsWith('/api/auth/')) {
@@ -88,12 +99,20 @@ async function api(path, options = {}) {
     try {
       await refreshSession();
     } catch {
+      const hadSession = Boolean(accessToken) || hasSessionHint();
       setToken(null);
+      if (hadSession) notifySessionExpired();
       throw toError(res, await parseJson(res.clone()).catch(() => ({})));
     }
     const retry = await rawFetch(path, options);
     const retryData = await parseJson(retry);
-    if (!retry.ok) throw toError(retry, retryData);
+    if (!retry.ok) {
+      if (retry.status === 401) {
+        setToken(null);
+        notifySessionExpired();
+      }
+      throw toError(retry, retryData);
+    }
     return retryData;
   }
   const data = await parseJson(res);

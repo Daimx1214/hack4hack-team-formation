@@ -730,3 +730,17 @@
   color: var(--text);
   border-bottom-color: var(--brand);
 }
+
+/* ---------- 404 (§5.7) ---------- */
+.not-found {
+  text-align: center;
+  padding-top: 48px;
+}
+.not-found-code {
+  font-family: var(--font-mono);
+  font-size: 96px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brand-text);
+  margin-bottom: 16px;
+}

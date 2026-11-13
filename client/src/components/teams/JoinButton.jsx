@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { teamsApi } from '../../api';
 import Button from '../ui/Button';
@@ -20,7 +20,6 @@ import { useToast } from '../ui/Toast';
 export default function JoinButton({ team, user, onUpdate }) {
   const [joining, setJoining] = useState(false);
   const toast = useToast();
-  const navigate = useNavigate();
   const location = useLocation();
 
   // Order matters: membership first (a member of a full team is still
@@ -75,8 +74,9 @@ export default function JoinButton({ team, user, onUpdate }) {
         const fresh = await teamsApi.get(team.id).catch(() => null);
         if (fresh) onUpdate(fresh.team);
       } else if (err.status === 401) {
-        toast.error('Your session expired. Log in again.');
-        navigate(`/login?returnTo=${encodeURIComponent(location.pathname)}`);
+        // The API layer has already notified the app shell, which shows
+        // the 'Your session expired' toast and redirects to /login —
+        // handling it here too would double both.
       } else if (err.code === 'RATE_LIMITED') {
         toast.error('Too many attempts. Try again in a minute.');
       } else {

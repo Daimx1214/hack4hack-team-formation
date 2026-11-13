@@ -474,6 +474,10 @@
   font-weight: 500;
   padding: 0 4px;
 }
+.nav-auth-desktop {
+  display: inline-flex;
+  gap: 8px;
+}
 @media (max-width: 768px) {
   .nav-links,
   .nav-auth-desktop {

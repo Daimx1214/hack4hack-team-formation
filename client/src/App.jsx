@@ -13,6 +13,8 @@ import TeamDetail from './pages/TeamDetail';
 import CreateTeam from './pages/CreateTeam';
 import EditTeam from './pages/EditTeam';
 import Dashboard from './pages/Dashboard';
+import NotFound from './pages/NotFound';
+import { useToast } from './components/ui/Toast';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 
 // Reset the scroll position on every navigation. Hash links (e.g.
@@ -53,6 +55,23 @@ function AppShell() {
       .catch(() => setToken(null))
       .finally(() => setSessionReady(true));
   }, []);
+
+  // Spec §5.8: when the API layer finds the session truly over, it
+  // dispatches 'tf:session-expired' — toast and send the user to log in
+  // again, returning them to where they were.
+  const toast = useToast();
+  useEffect(() => {
+    function onSessionExpired() {
+      setUser(null);
+      const path = window.location.pathname;
+      if (path !== '/login' && path !== '/register') {
+        toast.error('Your session expired');
+        navigate(`/login?returnTo=${encodeURIComponent(path)}`);
+      }
+    }
+    window.addEventListener('tf:session-expired', onSessionExpired);
+    return () => window.removeEventListener('tf:session-expired', onSessionExpired);
+  }, [navigate, toast]);
 
   function handleAuth(data, returnTo) {
     setToken(data.accessToken);
@@ -99,6 +118,7 @@ function AppShell() {
             }
           />
           <Route path="/teams/:id" element={<TeamDetail user={user} />} />
+          <Route path="*" element={<NotFound />} />
           <Route
             path="/teams/:id/edit"
             element={
