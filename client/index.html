@@ -7,7 +7,22 @@
       name="description"
       content="TeamForge — race-proof team formation for hackathons. Fixed-capacity teams, atomic joins: a team can never over-fill, even in a stampede."
     />
-    <meta name="theme-color" content="#081226" />
+    <meta name="theme-color" content="#0b1e42" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply the saved theme (or the OS preference) before first paint,
+      // so the page never flashes the wrong colour scheme.
+      (function () {
+        var saved = null;
+        try {
+          saved = localStorage.getItem('teamforge-theme');
+        } catch (e) {}
+        var theme =
+          saved ||
+          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

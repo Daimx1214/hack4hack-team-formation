@@ -26,7 +26,6 @@ export default function Login({ onAuth }) {
     <div className="container">
     <div className="card form-card">
       <h1>Log in</h1>
-      <p className="hint">Welcome back. Demo accounts: any seed user with password demo1234.</p>
       <form onSubmit={handleSubmit}>
         <label>
           Email

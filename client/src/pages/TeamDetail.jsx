@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { teamsApi } from '../api';
 
 // Team detail page: member list plus Join / Leave / Delete actions.
@@ -194,7 +194,11 @@ export default function TeamDetail({ user }) {
             )}
           </div>
         ) : (
-          <p className="hint">Log in to join this team.</p>
+          <div className="actions">
+            <Link to="/login" className="btn-link">
+              Log in to join this team
+            </Link>
+          </div>
         )}
       </div>
     </div>

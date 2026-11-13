@@ -36,7 +36,6 @@ export default function Register({ onAuth }) {
     <div className="container">
     <div className="card form-card">
       <h1>Create your account</h1>
-      <p className="hint">Join TeamForge to create a team or claim a seat in one.</p>
       <form onSubmit={handleSubmit}>
         <label>
           Name
