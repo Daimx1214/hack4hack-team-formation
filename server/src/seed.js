@@ -38,7 +38,7 @@ const DEMO_USERS = [
 const DEMO_TEAMS = [
   {
     name: 'API Wizards',
-    description: 'Building a race-proof hackathon API. One seat left!',
+    description: 'Building a race-proof hackathon API with Node and MongoDB.',
     capacity: 4,
     skillsNeeded: ['React', 'MongoDB'],
     members: ['ayesha@example.com', 'bilal@example.com', 'chen@example.com'], // 3/4
