@@ -1,10 +1,30 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const mongoose = require('mongoose');
 const authRoutes = require('./routes/authRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const { getStats } = require('./controllers/teamController');
 const asyncHandler = require('./utils/asyncHandler');
+const { makeLimiters } = require('./middleware/rateLimit');
+
+// CORS allowlist (Spec §11): exact origins only, from the CORS_ORIGINS
+// env var (comma-separated). Requests without an Origin header (curl,
+// server-to-server, tests) are not CORS requests and pass through.
+const DEFAULT_ORIGINS = 'http://localhost:5173,https://hack4hack-web.vercel.app';
+function corsOptions() {
+  const allowed = (process.env.CORS_ORIGINS || DEFAULT_ORIGINS)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    origin(origin, callback) {
+      if (!origin || allowed.includes(origin)) return callback(null, true);
+      return callback(null, false);
+    },
+    credentials: true,
+  };
+}
 
 /**
  * Build the Express app. Kept separate from server.js so tests can import
@@ -12,9 +32,18 @@ const asyncHandler = require('./utils/asyncHandler');
  */
 function createApp() {
   const app = express();
+  const { globalLimiter } = makeLimiters();
 
-  app.use(cors());
-  app.use(express.json());
+  // Behind the host's proxy (Vercel) the real client IP is in
+  // X-Forwarded-For; trust exactly one hop so rate limiting keys on the
+  // real IP instead of the proxy's.
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+
+  app.use(helmet());
+  app.use(cors(corsOptions()));
+  app.use(globalLimiter);
+  app.use(express.json({ limit: '10kb' }));
 
   // Health: reports process uptime and whether the database connection is
   // up; 503 when the DB is down so load balancers/monitors can tell the
@@ -42,6 +71,18 @@ function createApp() {
   // Production responses never leak stack traces or raw driver messages.
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
+    // Body-parser failures arrive here too: an oversized body is a 413
+    // and malformed JSON is a 400 — neither is a server fault.
+    if (err.type === 'entity.too.large') {
+      return res
+        .status(413)
+        .json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large' } });
+    }
+    if (err.type === 'entity.parse.failed') {
+      return res
+        .status(400)
+        .json({ error: { code: 'VALIDATION', message: 'Request body is not valid JSON' } });
+    }
     if (err.name === 'ValidationError') {
       const details = Object.values(err.errors).map((e) => ({
         field: e.path,

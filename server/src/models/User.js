@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
 // register controller) before the user is saved for the first time.
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('passwordHash')) return next();
-  this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
+  this.passwordHash = await bcrypt.hash(this.passwordHash, 12);
   next();
 });
 
